@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "UrbangrowApp",
-    "slug": "UrbangrowApp",
+    "name": "",
+    "slug": "",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/urbansplash.png",
     "scheme": "urbangrowapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
