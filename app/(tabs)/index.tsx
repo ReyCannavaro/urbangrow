@@ -1,30 +1,24 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 
-function getRandomArbitrary(min: number, max: number): number {
-    return Math.random() * (max - min) + min;
+const API_BASE_URL = 'http://10.0.2.2:3000/api'; 
+
+interface SensorData {
+    temperature: number;
+    ph: number;
+    ldr_value: number;
+    timestamp: string;
 }
 
-const generateNewData = (currentPh: number, currentTemp: number) => {
-    const phChange = getRandomArbitrary(-0.05, 0.05);
-    let nextPh = currentPh + phChange;
-    
-    if (nextPh < 6.0) nextPh = 6.0 + getRandomArbitrary(0, 0.1);
-    if (nextPh > 8.5) nextPh = 8.5 - getRandomArbitrary(0, 0.1);
-
-    const tempChange = getRandomArbitrary(-0.25, 0.25);
-    let nextTemp = currentTemp + tempChange;
-
-    if (nextTemp < 20.0) nextTemp = 20.0 + getRandomArbitrary(0, 0.3);
-    if (nextTemp > 32.0) nextTemp = 32.0 - getRandomArbitrary(0, 0.3);
-
-    return {
-        ph: parseFloat(nextPh.toFixed(2)),
-        temp: parseFloat(nextTemp.toFixed(1))
-    };
+const initialData: SensorData = {
+    temperature: 0.0,
+    ph: 0.0,
+    ldr_value: 0,
+    timestamp: new Date().toISOString()
 };
+
 
 interface DataCardProps {
     title: string;
@@ -60,7 +54,7 @@ interface AnalysisResult {
 const analyzeWaterCondition = (temp: number, ph: number): AnalysisResult => {
     let tempStatus = '';
     let phStatus = '';
-    let dynamicBorderColor = '#10b981';
+    let dynamicBorderColor = '#10b981'; 
 
     if (temp > 32) {
         tempStatus = 'Terlalu Panas';
@@ -78,16 +72,16 @@ const analyzeWaterCondition = (temp: number, ph: number): AnalysisResult => {
         dynamicBorderColor = '#3b82f6';
     }
     
-    let tempDynamicColor = dynamicBorderColor;
+    let tempDynamicColor = dynamicBorderColor; 
 
     if (ph >= 6.0 && ph <= 7.5) {
         phStatus = 'Ideal (Netral)';
     } else if (ph < 6.0) {
         phStatus = 'Asam';
-        if (tempDynamicColor !== '#ef4444') { dynamicBorderColor = '#f59e0b'; } // Jika belum kritis, jadikan waspada
+        if (tempDynamicColor !== '#ef4444') { dynamicBorderColor = '#f59e0b'; } 
     } else {
         phStatus = 'Basa (Alkaline)';
-        if (tempDynamicColor !== '#ef4444') { dynamicBorderColor = '#f59e0b'; } // Jika belum kritis, jadikan waspada
+        if (tempDynamicColor !== '#ef4444') { dynamicBorderColor = '#f59e0b'; }
     }
 
     let conclusion = `Kondisi air saat ini ${tempStatus} (${temp.toFixed(1)}°C) dan pH ${ph.toFixed(2)} (${phStatus}).`;
@@ -99,10 +93,10 @@ const analyzeWaterCondition = (temp: number, ph: number): AnalysisResult => {
         dynamicBorderColor = '#ef4444';
     } else if (phStatus !== 'Ideal (Netral)') {
         conclusion += ` Kualitas pH air perlu dikoreksi.`;
-    } else {
+    } else if (tempStatus !== 'Hangat') {
         conclusion += ` Kondisi Suhu dan pH berada di batas aman.`;
     }
-
+    
     return { tempStatus, phStatus, conclusion, dynamicBorderColor };
 };
 
@@ -158,18 +152,55 @@ const StatusButton: React.FC<StatusButtonProps> = ({ label, value, borderColor }
 );
 
 const HomePage: React.FC = () => {
-    const [currentPh, setCurrentPh] = useState<number>(7.2); 
-    const [currentTemp, setCurrentTemp] = useState<number>(25.5); 
+    const [sensorData, setSensorData] = useState<SensorData>(initialData); 
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchData = useCallback(async () => {
+        try {
+            const url = `${API_BASE_URL}/latest-reading`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`Server merespons dengan status: ${response.status}`);
+            }
+
+            const data: SensorData = await response.json();
+            
+            const formattedData = {
+                ...data,
+                temperature: parseFloat(data.temperature.toString()), 
+                ph: parseFloat(data.ph.toString()),
+                ldr_value: parseInt(data.ldr_value.toString(), 10),
+            };
+
+            setSensorData(formattedData);
+            setError(null);
+        } catch (err: any) {
+            console.error("Fetch Data GAGAL:", err);
+            setError(`Gagal terkoneksi ke server: ${err.message}. Cek koneksi & URL.`);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
-        const intervalId = setInterval(() => {
-            const newData = generateNewData(currentPh, currentTemp);
-            setCurrentPh(newData.ph);
-            setCurrentTemp(newData.temp);
-        }, 3000);
+        fetchData();
+        const intervalId = setInterval(fetchData, 5000);
 
         return () => clearInterval(intervalId);
-    }, [currentPh, currentTemp]);
+    }, [fetchData]);
+
+    if (isLoading) {
+        return (
+            <View style={[styles.container, styles.loadingContainer]}>
+                <ActivityIndicator size="large" color="#3b82f6" />
+                <Text style={styles.loadingText}>Menghubungkan ke API...</Text>
+            </View>
+        );
+    }
+
+    const { temperature, ph, ldr_value } = sensorData;
 
     return (
         <View style={styles.container}>
@@ -183,10 +214,19 @@ const HomePage: React.FC = () => {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 
+                {error && (
+                    <View style={styles.errorBox}>
+                        <Feather name="alert-triangle" size={24} color="#ef4444" />
+                        <Text style={styles.errorText}>
+                            {error}
+                        </Text>
+                    </View>
+                )}
+                
                 <View style={styles.dataRow}>
                     <DataCard
                         title="Suhu Air"
-                        value={currentTemp.toFixed(1)}
+                        value={temperature.toFixed(1)} 
                         unit="°C"
                         iconName="thermometer"
                         bgColor="#e0f2fe"
@@ -195,7 +235,7 @@ const HomePage: React.FC = () => {
                     />
                     <DataCard
                         title="PH Air"
-                        value={currentPh.toFixed(2)}
+                        value={ph.toFixed(2)} 
                         unit=""
                         iconName="droplet"
                         bgColor="#dcfce7"
@@ -203,8 +243,18 @@ const HomePage: React.FC = () => {
                         borderColor="#10b981"
                     />
                 </View>
+                
+                <DataCard
+                    title="Intensitas Cahaya (LDR)"
+                    value={ldr_value.toString()} 
+                    unit="lux"
+                    iconName="sun"
+                    bgColor="#fefce8"
+                    iconColor="#f59e0b"
+                    borderColor="#f59e0b"
+                />
 
-                <WaterConditionCard currentTemp={currentTemp} currentPh={currentPh} />
+                <WaterConditionCard currentTemp={temperature} currentPh={ph} />
 
                 <View style={styles.statusHeader}>
                     <Feather name="message-square" size={20} color="#6366f1" />
@@ -212,8 +262,8 @@ const HomePage: React.FC = () => {
                 </View>
 
                 <View style={styles.statusGrid}>
-                    <StatusButton label="Lele" value="27 Ekor" borderColor="#3b82f6" />
-                    <StatusButton label="Nila" value="27 Ekor" borderColor="#3b82f6" />
+                    <StatusButton label="Pompa Air" value="OFF" borderColor="#3b82f6" />
+                    <StatusButton label="Lampu Tumbuh" value="OFF" borderColor="#10b981" />
                     <StatusButton label="Pakcoy" value="14 Hari" borderColor="#10b981" />
                     <StatusButton label="Kangkung" value="17 Hari" borderColor="#10b981" />
                 </View>
@@ -231,6 +281,15 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f8f8f8',
+    },
+    loadingContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 10,
+        fontSize: 16,
+        color: '#6b7280',
     },
 
     header: {
@@ -254,6 +313,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         paddingBottom: 10,
     },
+    
+    errorBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fee2e2',
+        borderColor: '#ef4444',
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 15,
+        marginBottom: 15,
+    },
+    errorText: {
+        marginLeft: 10,
+        fontSize: 14,
+        color: '#ef4444',
+        flexShrink: 1,
+    },
 
     dataRow: {
         flexDirection: 'row',
@@ -265,6 +341,8 @@ const styles = StyleSheet.create({
         borderRadius: 15,
         padding: 15,
         borderWidth: 1.5,
+        marginBottom: 10,
+        backgroundColor: '#fff',
     },
     cardHeader: {
         flexDirection: 'row',
@@ -313,6 +391,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderColor: '#10b981',
         marginBottom: 20,
+        flex: 1,
     },
     oxygenHeader: {
         alignItems: 'flex-end',

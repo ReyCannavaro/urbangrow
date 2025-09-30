@@ -1,0 +1,23 @@
+{
+  "name": "aquaponics-api",
+  "version": "1.0.0",
+  "description": "API Gateway for Aquaponics Monitoring System (React Native + MySQL)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "mysql",
+    "aquaponics"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "mysql": "^2.18.1"
+  }
+}
