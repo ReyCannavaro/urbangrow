@@ -75,7 +75,6 @@ function initializeTables() {
 
 connectDatabase(); 
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -167,7 +166,7 @@ app.post('/api/actuator-control', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`\n========================================================================`);
-    console.log(`✅ Server API Aquaponics BERJALAN di: http://localhost:${PORT}`);
+    console.log(`Server API Aquaponics BERJALAN di: http://localhost:${PORT}`);
     console.log(`========================================================================`);
     console.log(`PASTIKAN Anda sudah menginstal: npm install express mysql cors`);
     console.log(`Pastikan kredensial database di 'dbConfig' sudah benar.`);

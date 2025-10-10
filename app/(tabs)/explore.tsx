@@ -2,12 +2,12 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -42,7 +42,7 @@ const recommendationData: RecommendationItem[] = [
 ];
 
 const MainControlCard: React.FC<ControlItem> = ({ id, title, icon, color }) => {
-    const [isOn, setIsOn] = useState(true); // Default ON
+    const [isOn, setIsOn] = useState(true);
 
     const handlePress = () => {
         setIsOn(prev => !prev);

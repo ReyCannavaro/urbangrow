@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "",
-    "slug": "",
+    "slug": "Urban Grow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/urbansplash.png",
@@ -38,7 +38,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

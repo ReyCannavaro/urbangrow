@@ -1,31 +1,29 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Alert } from 'react-native'; // Tambahkan Alert
 
-function getRandomArbitrary(min: number, max: number): number {
-    return Math.random() * (max - min) + min;
+// *******************************************************************
+// *** KONFIGURASI API (UBAH SESUAI IP ANDA) ***
+// Ganti dengan IP Address server Anda (misal: 'http://192.168.1.100:3000')
+const API_BASE_URL = 'http://10.0.2.2:3000'; // <--- PASTIKAN INI BENAR!
+// *******************************************************************
+
+// --- DEFINISI TIPE DATA ---
+interface SensorData {
+    temperature: number;
+    ph: number;
+    ldr_value: number; // Tetap ada di tipe data karena dikirim dari server
+    timestamp: string;
 }
 
-const generateNewData = (currentPh: number, currentTemp: number) => {
-    const phChange = getRandomArbitrary(-0.05, 0.05);
-    let nextPh = currentPh + phChange;
-    
-    if (nextPh < 6.0) nextPh = 6.0 + getRandomArbitrary(0, 0.1);
-    if (nextPh > 8.5) nextPh = 8.5 - getRandomArbitrary(0, 0.1);
+interface ActuatorStatus {
+    pumpStatus: 'ON' | 'OFF';
+    lightStatus: 'ON' | 'OFF';
+}
+// --- AKHIR DEFINISI TIPE DATA ---
 
-    const tempChange = getRandomArbitrary(-0.25, 0.25);
-    let nextTemp = currentTemp + tempChange;
-
-    if (nextTemp < 20.0) nextTemp = 20.0 + getRandomArbitrary(0, 0.3);
-    if (nextTemp > 32.0) nextTemp = 32.0 - getRandomArbitrary(0, 0.3);
-
-    return {
-        ph: parseFloat(nextPh.toFixed(2)),
-        temp: parseFloat(nextTemp.toFixed(1)),
-    };
-};
-
+// Hapus fungsi getRandomArbitrary dan generateNewData yang lama
 
 interface DataCardProps {
     title: string;
@@ -111,19 +109,29 @@ const analyzeWaterCondition = (temp: number, ph: number): AnalysisResult => {
 interface WaterConditionCardProps {
     currentTemp: number;
     currentPh: number;
+    isLoading: boolean;
 }
 
-const WaterConditionCard: React.FC<WaterConditionCardProps> = ({ currentTemp, currentPh }) => {
+const WaterConditionCard: React.FC<WaterConditionCardProps> = ({ currentTemp, currentPh, isLoading }) => {
+    // Tampilkan loading jika data masih 0.0 atau sedang fetch
+    if (isLoading && currentTemp === 0.0) {
+        return (
+            <View style={[styles.card, styles.oxygenCard, { borderColor: '#9ca3af', width: '100%' }]}>
+                <Text style={{ textAlign: 'center', color: '#6b7280', padding: 20 }}>Memuat data sensor...</Text>
+            </View>
+        );
+    }
+
     const { tempStatus, phStatus, conclusion, dynamicBorderColor } = analyzeWaterCondition(currentTemp, currentPh); 
     const overallLabel = (tempStatus === 'Hangat' && phStatus === 'Ideal (Netral)') ? 'Optimal' : 'Perlu Cek';
 
     return ( 
-        <View style={[styles.card, styles.oxygenCard, { borderColor: dynamicBorderColor }]}> 
+        <View style={[styles.card, styles.oxygenCard, { borderColor: dynamicBorderColor, width: '100%' }]}> 
             <View style={styles.oxygenHeader}> 
-                <Text  
+                <Text  
                     style={[ 
-                        styles.cardNormalLabel,  
-                        styles.oxygenNormalLabel,  
+                        styles.cardNormalLabel,  
+                        styles.oxygenNormalLabel,  
                         { borderColor: dynamicBorderColor, color: dynamicBorderColor, backgroundColor: 'rgba(255, 255, 255, 0.9)' } // Sedikit ubah background agar lebih terlihat 
                     ]} 
                 > 
@@ -160,20 +168,61 @@ const StatusButton: React.FC<StatusButtonProps> = ({ label, value, borderColor }
 ); 
 
 const HomePage: React.FC = () => {
-    const [currentPh, setCurrentPh] = useState<number>(7.0); 
-    const [currentTemp, setCurrentTemp] = useState<number>(26.5);
+    // 1. State untuk menyimpan data sensor dan aktuator
+    const [sensorData, setSensorData] = useState<SensorData>({ temperature: 0.0, ph: 0.0, ldr_value: 0, timestamp: '' });
+    const [actuatorStatus, setActuatorStatus] = useState<ActuatorStatus>({ pumpStatus: 'OFF', lightStatus: 'OFF' });
+    const [isLoading, setIsLoading] = useState(true);
+    const [isConnected, setIsConnected] = useState(false);
 
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            const newData = generateNewData(currentPh, currentTemp);
+    // 2. Fungsi untuk mengambil data dari server
+    const fetchData = async () => {
+        try {
+            // Ambil Data Sensor Terbaru
+            const sensorResponse = await fetch(`${API_BASE_URL}/api/latest-reading`);
+            const sensorJson = await sensorResponse.json();
             
-            // Perbarui semua state
-            setCurrentPh(newData.ph);
-            setCurrentTemp(newData.temp);
-        }, 3000);
+            // Ambil Status Aktuator
+            const actuatorResponse = await fetch(`${API_BASE_URL}/api/actuator-status`);
+            const actuatorJson = await actuatorResponse.json();
+            
+            setSensorData(sensorJson);
+            setActuatorStatus(actuatorJson);
+            setIsConnected(true);
 
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            setIsConnected(false);
+            
+            // Tampilkan pesan error hanya sekali saat pertama kali gagal
+            if (isLoading) {
+                 Alert.alert(
+                    "Koneksi Gagal 🔴",
+                    `Tidak dapat terhubung ke server API di ${API_BASE_URL}. Pastikan server.js berjalan dan IP sudah benar.`,
+                    [{ text: "OK" }]
+                );
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // 3. useEffect untuk menjalankan fetching secara berkala (setiap 3 detik)
+    useEffect(() => {
+        fetchData(); // Ambil data segera saat komponen di-mount
+        
+        const intervalId = setInterval(fetchData, 3000); // Ambil data setiap 3 detik
+
+        // Cleanup function
         return () => clearInterval(intervalId);
-    }, [currentPh, currentTemp]);
+    }, []); // Dependency array kosong agar interval hanya dibuat sekali
+
+    // 4. Mapping data sensor
+    // Gunakan 0.0 jika data belum terambil (atau null/undefined)
+    const currentTemp = sensorData.temperature || 0.0;
+    const currentPh = sensorData.ph || 0.0;
+
+    // Perbarui Tampilan Header dengan Status Koneksi
+    const headerStatus = isConnected ? '🟢' : '🔴';
 
     return ( 
         <View style={styles.container}> 
@@ -182,7 +231,9 @@ const HomePage: React.FC = () => {
                 start={{ x: 0, y: 0 }} 
                 end={{ x: 1, y: 0 }} 
                 style={styles.header}> 
-                <Text style={styles.headerText}>Sistem Aktif : Urban Farm 1</Text> 
+                <Text style={styles.headerText}>
+                    Sistem Aktif : Urban Farm 1 {headerStatus}
+                </Text> 
             </LinearGradient> 
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}> 
@@ -208,21 +259,35 @@ const HomePage: React.FC = () => {
                     /> 
                 </View> 
 
-                <WaterConditionCard currentTemp={currentTemp} currentPh={currentPh} /> 
+                <WaterConditionCard currentTemp={currentTemp} currentPh={currentPh} isLoading={isLoading} /> 
 
+                {/* Status Aktuator Baru */}
                 <View style={styles.statusHeader}> 
-                    <Feather name="message-square" size={20} color="#6366f1" /> 
-                    <Text style={styles.statusTitle}>Status Ikan & Tanaman</Text> 
+                    <Feather name="zap" size={20} color="#6366f1" /> 
+                    <Text style={styles.statusTitle}>Kontrol Aktuator</Text> 
                 </View> 
 
                 <View style={styles.statusGrid}> 
+                    {/* Status Pompa Air */}
+                    <StatusButton 
+                        label="Pompa Air" 
+                        value={actuatorStatus.pumpStatus} 
+                        borderColor={actuatorStatus.pumpStatus === 'ON' ? '#ef4444' : '#6b7280'} 
+                    /> 
+                    {/* Status Lampu */}
+                    <StatusButton 
+                        label="Lampu (LED Grow)" 
+                        value={actuatorStatus.lightStatus} 
+                        borderColor={actuatorStatus.lightStatus === 'ON' ? '#f59e0b' : '#6b7280'} 
+                    /> 
+                    {/* Data ikan dan tanaman tetap statis sesuai desain lama */}
                     <StatusButton label="Lele" value="27 Ekor" borderColor="#3b82f6" /> 
                     <StatusButton label="Nila" value="27 Ekor" borderColor="#3b82f6" /> 
                     <StatusButton label="Pakcoy" value="14 Hari" borderColor="#10b981" /> 
                     <StatusButton label="Kangkung" value="17 Hari" borderColor="#10b981" /> 
                 </View> 
                 
-                <View style={{ height: 100 }} />  
+                <View style={{ height: 100 }} />  
             </ScrollView> 
         </View> 
     ); 
