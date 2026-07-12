@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '@/constants/api';
 import { AppTheme } from '@/constants/theme';
 import { useApiStatus } from '@/hooks/use-api-status';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 const formatLastChecked = (date: Date | null) => {
   if (!date) {
@@ -47,32 +48,37 @@ export const ApiStatusBanner = () => {
   const toneStyles = isOffline ? offlineTone : staleTone;
 
   return (
-    <View style={[styles.banner, toneStyles.banner, { top: insets.top + 10 }]}>
-      <View style={[styles.iconWrap, toneStyles.iconWrap]}>
-        <Feather name={iconName} size={16} color={toneStyles.icon.color} />
-      </View>
-      <View style={styles.copy}>
-        <Text style={[styles.title, toneStyles.title]}>{title}</Text>
-        <Text style={[styles.message, toneStyles.message]} numberOfLines={1}>
-          {message}
-        </Text>
-      </View>
-      <Pressable
-        onPress={checkApiStatus}
-        disabled={isChecking}
-        style={({ pressed }) => [
-          styles.retryButton,
-          toneStyles.iconWrap,
-          { opacity: pressed || isChecking ? 0.65 : 1 },
-        ]}
-      >
-        {isChecking ? (
-          <ActivityIndicator size="small" color={toneStyles.icon.color} />
-        ) : (
-          <Feather name="refresh-cw" size={16} color={toneStyles.icon.color} />
-        )}
-      </Pressable>
-    </View>
+    <GlassPanel
+      style={[styles.banner, toneStyles.banner, { top: insets.top + 10 }]}
+      contentStyle={styles.bannerContent}
+      intensity={74}
+      variant="strong"
+    >
+        <View style={[styles.iconWrap, toneStyles.iconWrap]}>
+          <Feather name={iconName} size={16} color={toneStyles.icon.color} />
+        </View>
+        <View style={styles.copy}>
+          <Text style={[styles.title, toneStyles.title]}>{title}</Text>
+          <Text style={[styles.message, toneStyles.message]} numberOfLines={1}>
+            {message}
+          </Text>
+        </View>
+        <Pressable
+          onPress={checkApiStatus}
+          disabled={isChecking}
+          style={({ pressed }) => [
+            styles.retryButton,
+            toneStyles.iconWrap,
+            { opacity: pressed || isChecking ? 0.65 : 1 },
+          ]}
+        >
+          {isChecking ? (
+            <ActivityIndicator size="small" color={toneStyles.icon.color} />
+          ) : (
+            <Feather name="refresh-cw" size={16} color={toneStyles.icon.color} />
+          )}
+        </Pressable>
+    </GlassPanel>
   );
 };
 
@@ -83,16 +89,13 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 200,
     elevation: 20,
+    borderRadius: AppTheme.radius.card,
+  },
+  bannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: AppTheme.radius.card,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    shadowColor: AppTheme.shadow.color,
-    shadowOffset: AppTheme.shadow.offset,
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
   },
   iconWrap: {
     width: 30,
@@ -128,7 +131,6 @@ const styles = StyleSheet.create({
 const offlineTone = StyleSheet.create({
   banner: {
     borderColor: '#f4b7ae',
-    backgroundColor: AppTheme.color.dangerSoft,
   },
   iconWrap: {
     backgroundColor: '#f9d1ca',
@@ -147,7 +149,6 @@ const offlineTone = StyleSheet.create({
 const staleTone = StyleSheet.create({
   banner: {
     borderColor: '#f3d48b',
-    backgroundColor: AppTheme.color.warningSoft,
   },
   iconWrap: {
     backgroundColor: '#f7e5b7',

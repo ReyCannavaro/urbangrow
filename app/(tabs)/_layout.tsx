@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ApiStatusBanner } from '@/components/system/ApiStatusBanner';
@@ -18,6 +19,14 @@ export default function TabLayout() {
           tabBarLabelStyle: styles.tabBarLabel,
           tabBarItemStyle: styles.tabBarItem,
           tabBarStyle: styles.tabBar,
+          tabBarBackground: () => (
+            <BlurView
+              intensity={82}
+              tint="dark"
+              experimentalBlurMethod="dimezisBlurView"
+              style={StyleSheet.absoluteFill}
+            />
+          ),
         }}>
         <Tabs.Screen
           name="index"
@@ -67,14 +76,17 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     height: 76,
-    backgroundColor: AppTheme.color.surfaceStrong,
-    borderTopWidth: 0,
+    backgroundColor: 'rgba(8, 24, 18, 0.36)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.18)',
     position: 'absolute',
     bottom: 12,
     left: 16,
     right: 16,
     borderRadius: AppTheme.radius.panel,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
     shadowColor: AppTheme.shadow.color,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.18,

@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { apiPost } from '@/constants/api';
 import { AppTheme } from '@/constants/theme';
+import { GlassBackground } from '@/components/ui/GlassBackground';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 const USER_COLOR = AppTheme.color.primaryDark;
 const BOT_LOADING_COLOR = AppTheme.color.neutral;
@@ -134,9 +136,9 @@ const ChatBubble: React.FC<{ message: Message }> = ({ message }) => {
                     <Text style={styles.userText}>{message.text}</Text>
                 </View>
             ) : (
-                <View style={bubbleStyles}>
+                <GlassPanel style={bubbleStyles} intensity={62} variant="strong">
                     <AdvancedMessageParser content={message.text} style={styles.botText} />
-                </View>
+                </GlassPanel>
             )}
         </View>
     );
@@ -205,17 +207,18 @@ const ChatbotPage: React.FC = () => {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
         >
+            <GlassBackground />
 
-            <View style={styles.header}>
+            <GlassPanel style={styles.header} contentStyle={styles.headerInner} intensity={72} variant="strong">
                 <View style={styles.headerIcon}>
-                    <Feather name="message-circle" size={22} color={AppTheme.color.primarySoft} />
+                    <Feather name="message-circle" size={22} color={AppTheme.color.primaryDark} />
                 </View>
                 <View style={styles.headerCopy}>
                     <Text style={styles.headerEyebrow}>Assistant</Text>
                     <Text style={styles.headerTitle}>AgriBot Console</Text>
                     <Text style={styles.headerSubtitle}>Jawaban praktis untuk air, tanaman, dan perawatan sistem.</Text>
                 </View>
-            </View>
+            </GlassPanel>
 
             <ScrollView
                 ref={scrollViewRef}
@@ -225,13 +228,13 @@ const ChatbotPage: React.FC = () => {
             >
 
                 {messages.length <= 1 && !isLoading ? (
-                    <View style={styles.welcomePromptContainer}>
+                    <GlassPanel style={styles.welcomePromptContainer} contentStyle={styles.welcomePromptContent} intensity={62} variant="strong">
                         <View style={styles.welcomeIconWrap}>
                             <Feather name="message-circle" size={34} color={AppTheme.color.primaryDark} />
                         </View>
                         <Text style={styles.chatPrompt}>Ada yang bisa saya bantu?</Text>
                         <Text style={styles.chatPromptSubtitle}>Tanyakan pH, suhu, nutrisi, atau perawatan sistem.</Text>
-                    </View>
+                    </GlassPanel>
                 ) : (
                     messages.map(msg => (
                         <ChatBubble key={msg.id} message={msg} />
@@ -239,15 +242,15 @@ const ChatbotPage: React.FC = () => {
                 )}
                 
                 {isLoading && (
-                    <View style={styles.loadingContainer}>
+                    <GlassPanel style={styles.loadingContainer} contentStyle={styles.loadingContent} intensity={56} variant="strong">
                         <ActivityIndicator size="small" color={BOT_ACTIVE_COLOR} />
                         <Text style={styles.loadingText}>AgriBot sedang berpikir...</Text>
-                    </View>
+                    </GlassPanel>
                 )}
 
             </ScrollView>
 
-            <View style={styles.suggestedQuestionsWrapper}>
+            <GlassPanel style={styles.suggestedQuestionsWrapper} contentStyle={styles.suggestedQuestionsInner} intensity={64} variant="thin">
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -256,7 +259,7 @@ const ChatbotPage: React.FC = () => {
                     {SuggestedQuestions.map((q, index) => (
                         <Pressable
                             key={index}
-                            style={styles.questionButton}
+                            style={({ pressed }) => [styles.questionButton, pressed && styles.questionButtonPressed]}
                             onPress={() => handleQuestionPress(q)}
                             disabled={isLoading}
                         >
@@ -264,9 +267,9 @@ const ChatbotPage: React.FC = () => {
                         </Pressable>
                     ))}
                 </ScrollView>
-            </View>
+            </GlassPanel>
 
-            <View style={styles.inputContainer}>
+            <GlassPanel style={styles.inputContainer} contentStyle={styles.inputContent} intensity={72} variant="strong">
                 <TextInput
                     style={styles.textInput}
                     placeholder={isLoading ? "Menunggu balasan..." : "Tanya AgriBot"}
@@ -288,7 +291,7 @@ const ChatbotPage: React.FC = () => {
                 >
                     <Feather name="send" size={22} color={AppTheme.color.surface} />
                 </Pressable>
-            </View>
+            </GlassPanel>
         </KeyboardAvoidingView>
     );
 };
@@ -302,15 +305,16 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        paddingHorizontal: 18,
-        paddingVertical: 18,
         marginTop: 25,
         marginHorizontal: 16,
         marginBottom: 6,
         borderRadius: AppTheme.radius.panel,
-        backgroundColor: AppTheme.color.surfaceStrong,
+    },
+    headerInner: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        paddingHorizontal: 18,
+        paddingVertical: 18,
     },
     headerIcon: {
         width: 48,
@@ -318,9 +322,9 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(223, 242, 233, 0.12)',
+        backgroundColor: AppTheme.color.primarySoft,
         borderWidth: 1,
-        borderColor: 'rgba(223, 242, 233, 0.18)',
+        borderColor: AppTheme.color.lineStrong,
         marginRight: 12,
     },
     headerCopy: {
@@ -328,7 +332,7 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     headerEyebrow: {
-        color: '#9fc8b7',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
         fontWeight: '800',
         marginBottom: 3,
@@ -336,10 +340,10 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 25,
         fontWeight: '900',
-        color: AppTheme.color.surface,
+        color: AppTheme.color.text,
     },
     headerSubtitle: {
-        color: '#c7d8d1',
+        color: AppTheme.color.textMuted,
         fontSize: 13,
         lineHeight: 18,
         marginTop: 4,
@@ -357,9 +361,16 @@ const styles = StyleSheet.create({
     },
     welcomePromptContainer: {
         flex: 1,
+        borderRadius: AppTheme.radius.panel,
+        marginTop: 80,
+        marginBottom: 24,
+    },
+    welcomePromptContent: {
+        minHeight: 260,
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 24,
+        paddingVertical: 30,
     },
     welcomeIconWrap: {
         width: 72,
@@ -408,9 +419,6 @@ const styles = StyleSheet.create({
     },
     botBubble: {
         borderTopLeftRadius: 5,
-        backgroundColor: AppTheme.color.surface,
-        borderWidth: 1,
-        borderColor: AppTheme.color.line,
     },
     userBubble: {
         borderTopRightRadius: 5,
@@ -468,16 +476,17 @@ const styles = StyleSheet.create({
     },
 
     loadingContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
         alignSelf: 'flex-start',
         marginVertical: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        backgroundColor: AppTheme.color.primaryMist,
         borderRadius: AppTheme.radius.card,
         borderTopLeftRadius: 6,
         maxWidth: '70%',
+    },
+    loadingContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 10,
     },
     loadingText: {
         marginLeft: 10,
@@ -487,8 +496,11 @@ const styles = StyleSheet.create({
     },
 
     suggestedQuestionsWrapper: {
-        borderTopWidth: 1,
-        borderTopColor: AppTheme.color.line,
+        marginHorizontal: 16,
+        marginBottom: 10,
+        borderRadius: AppTheme.radius.panel,
+    },
+    suggestedQuestionsInner: {
         paddingVertical: 10,
     },
     suggestedQuestions: {
@@ -501,7 +513,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 8,
         marginRight: 8,
-        backgroundColor: AppTheme.color.surface,
+        backgroundColor: 'rgba(255,255,255,0.54)',
+    },
+    questionButtonPressed: {
+        opacity: 0.72,
     },
     questionText: {
         color: AppTheme.color.text,
@@ -510,20 +525,22 @@ const styles = StyleSheet.create({
     },
 
     inputContainer: {
+        marginHorizontal: 16,
+        marginBottom: 96,
+        borderRadius: AppTheme.radius.panel,
+    },
+    inputContent: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        backgroundColor: AppTheme.color.surface,
-        paddingBottom: 96,
-        borderTopWidth: 1,
-        borderTopColor: AppTheme.color.line,
+        paddingHorizontal: 12,
+        paddingTop: 10,
+        paddingBottom: 10,
     },
     textInput: {
         flex: 1,
         minHeight: 45,
         maxHeight: 120,
-        backgroundColor: AppTheme.color.surfaceMuted,
+        backgroundColor: 'rgba(255,255,255,0.58)',
         borderRadius: 25,
         padding: 10,
         paddingHorizontal: 18,
