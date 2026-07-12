@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { API_BASE_URL, ActuatorStatus, apiGet, normalizeActuatorStatus } from '@/constants/api';
 
 const Feather = { 
     name: 'Feather', 
@@ -29,18 +30,11 @@ const LinearGradient = ({ colors, start, end, style, children }: any) => {
     return <View style={[style, gradientStyle]}>{children}</View>;
 };
 
-const API_BASE_URL = 'http://10.249.160.45:5000';
-
 interface SensorData {
     temperature: number;
     ph: number;
     ldr_value: number; 
     timestamp: string;
-}
-
-interface ActuatorStatus {
-    pumpStatus: 'ON' | 'OFF';
-    lightStatus: 'ON' | 'OFF';
 }
 
 let simulatedSensorData: SensorData = { temperature: 25.5, ph: 6.8, ldr_value: 450, timestamp: new Date().toISOString() };
@@ -77,28 +71,12 @@ const simulateNewData = (currentSensorData: SensorData, currentActuatorStatus: A
     return { sensor: newSensorData, actuator: newActuatorStatus };
 };
 
-const fetchJson = async <T,>(path: string): Promise<T> => {
-    const response = await fetch(`${API_BASE_URL}${path}`);
-
-    if (!response.ok) {
-        throw new Error(`API ${path} returned status ${response.status}`);
-    }
-
-    return response.json();
-};
-
 const normalizeSensorData = (payload: any): SensorData => ({
     temperature: Number(payload.temperature ?? 0),
     ph: Number(payload.ph ?? 0),
     ldr_value: Number(payload.ldr_value ?? payload.ldr ?? 0),
     timestamp: payload.timestamp ?? new Date().toISOString(),
 });
-
-const normalizeActuatorStatus = (payload: any): ActuatorStatus => ({
-    pumpStatus: payload.pumpStatus === 'ON' ? 'ON' : 'OFF',
-    lightStatus: payload.lightStatus === 'ON' ? 'ON' : 'OFF',
-});
-
 
 interface DataCardProps {
     title: string;
@@ -279,8 +257,8 @@ const HomePage: React.FC = () => {
     const fetchData = useCallback(async () => {
         try {
             const [latestReading, actuatorData] = await Promise.all([
-                fetchJson<SensorData>('/api/latest-reading'),
-                fetchJson<ActuatorStatus>('/api/actuator-status'),
+                apiGet<SensorData>('/api/latest-reading'),
+                apiGet<ActuatorStatus>('/api/actuator-status'),
             ]);
 
             const sensor = normalizeSensorData(latestReading);

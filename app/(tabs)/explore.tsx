@@ -1,8 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
+    ActivityIndicator,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -10,6 +11,7 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActuatorKey, ActuatorStatus, apiGet, apiPost, normalizeActuatorStatus } from '@/constants/api';
 
 const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
 const COLOR_BLUE = '#60a5fa';
@@ -18,14 +20,15 @@ const COLOR_ORANGE = '#f97316';
 
 interface ControlItem {
     id: 'pompa' | 'lampu';
+    actuatorKey: ActuatorKey;
     title: string;
     icon: keyof typeof Feather.glyphMap;
     color: string;
 }
 
 const controlItems: ControlItem[] = [
-    { id: 'pompa', title: 'Pompa Air', icon: 'droplet', color: COLOR_BLUE },
-    { id: 'lampu', title: 'Lampu LED', icon: 'sun', color: COLOR_YELLOW },
+    { id: 'pompa', actuatorKey: 'pumpStatus', title: 'Pompa Air', icon: 'droplet', color: COLOR_BLUE },
+    { id: 'lampu', actuatorKey: 'lightStatus', title: 'Lampu LED', icon: 'sun', color: COLOR_YELLOW },
 ];
 
 interface RecommendationItem {
@@ -41,14 +44,13 @@ const recommendationData: RecommendationItem[] = [
     { id: 3, text: 'Berapa Ph air dengan kualitas terbaik', icon: 'droplet', color: '#3b82f6' },
 ];
 
-const MainControlCard: React.FC<ControlItem> = ({ id, title, icon, color }) => {
-    const [isOn, setIsOn] = useState(true);
+interface MainControlCardProps extends ControlItem {
+    isDisabled: boolean;
+    isOn: boolean;
+    onToggle: (item: ControlItem, nextValue: 'ON' | 'OFF') => void;
+}
 
-    const handlePress = () => {
-        setIsOn(prev => !prev);
-        Alert.alert(title, `${title} telah ${!isOn ? 'diaktifkan (ON)' : 'dimatikan (OFF)'}.`);
-    };
-
+const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, isDisabled, isOn, onToggle, ...item }) => {
     const cardStyle = {
         backgroundColor: isOn ? color + '20' : '#fefefe', 
         borderColor: isOn ? color : '#cbd5e1',
@@ -62,9 +64,10 @@ const MainControlCard: React.FC<ControlItem> = ({ id, title, icon, color }) => {
             style={({ pressed }) => [
                 styles.mainControlCard, 
                 cardStyle,
-                { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
+                { opacity: isDisabled ? 0.55 : pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
             ]}
-            onPress={handlePress}
+            onPress={() => onToggle({ ...item, title, icon, color }, isOn ? 'OFF' : 'ON')}
+            disabled={isDisabled}
         >
             <Feather 
                 name={icon} 
@@ -129,6 +132,48 @@ const ExplorePage: React.FC = () => {
     const insets = useSafeAreaInsets();
     
     const [isFeederActive, setIsFeederActive] = useState(false);
+    const [actuatorStatus, setActuatorStatus] = useState<ActuatorStatus>({ pumpStatus: 'OFF', lightStatus: 'OFF' });
+    const [isActuatorLoading, setIsActuatorLoading] = useState(true);
+    const [activeControl, setActiveControl] = useState<ActuatorKey | null>(null);
+    const [controlError, setControlError] = useState('');
+
+    const fetchActuatorStatus = useCallback(async () => {
+        try {
+            const status = await apiGet<ActuatorStatus>('/api/actuator-status');
+            setActuatorStatus(normalizeActuatorStatus(status));
+            setControlError('');
+        } catch (error) {
+            console.warn('Failed to load actuator status:', error);
+            setControlError('Tidak terhubung ke API. Kontrol perangkat sementara nonaktif.');
+        } finally {
+            setIsActuatorLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchActuatorStatus();
+    }, [fetchActuatorStatus]);
+
+    const handleActuatorToggle = async (item: ControlItem, nextValue: 'ON' | 'OFF') => {
+        setActiveControl(item.actuatorKey);
+        setControlError('');
+
+        try {
+            const updatedStatus = await apiPost<ActuatorStatus>('/api/actuator-control', {
+                key: item.actuatorKey,
+                value: nextValue,
+            });
+
+            setActuatorStatus(normalizeActuatorStatus(updatedStatus));
+            Alert.alert(item.title, `${item.title} telah ${nextValue === 'ON' ? 'diaktifkan (ON)' : 'dimatikan (OFF)'}.`);
+        } catch (error) {
+            console.warn('Failed to update actuator status:', error);
+            setControlError('Gagal mengirim perintah ke API. Pastikan backend sedang berjalan.');
+            Alert.alert('Kontrol Gagal', 'Perintah belum terkirim ke sistem. Pastikan API UrbanGrow sedang berjalan.');
+        } finally {
+            setActiveControl(null);
+        }
+    };
 
     const handleFeedAction = () => {
         Alert.alert('Aksi Pakan', 'Pakan ikan telah dikeluarkan sekarang.');
@@ -148,11 +193,24 @@ const ExplorePage: React.FC = () => {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Kontrol Perangkat</Text>
+                    {controlError ? <Text style={styles.errorText}>{controlError}</Text> : null}
                     <View style={styles.mainControlsRow}>
                         {controlItems.map(item => (
-                            <MainControlCard key={item.id} {...item} />
+                            <MainControlCard
+                                key={item.id}
+                                {...item}
+                                isDisabled={isActuatorLoading || activeControl === item.actuatorKey || Boolean(controlError)}
+                                isOn={actuatorStatus[item.actuatorKey] === 'ON'}
+                                onToggle={handleActuatorToggle}
+                            />
                         ))}
                     </View>
+                    {isActuatorLoading ? (
+                        <View style={styles.loadingRow}>
+                            <ActivityIndicator size="small" color="#3b82f6" />
+                            <Text style={styles.loadingText}>Memuat status perangkat...</Text>
+                        </View>
+                    ) : null}
                 </View>
 
                 <View style={styles.section}>
@@ -255,6 +313,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 15,
+    },
+    errorText: {
+        color: '#dc2626',
+        fontSize: 13,
+        lineHeight: 18,
+        marginBottom: 10,
+    },
+    loadingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: -5,
+        marginBottom: 10,
+        paddingHorizontal: 5,
+    },
+    loadingText: {
+        color: '#4b5563',
+        fontSize: 13,
+        fontWeight: '500',
+        marginLeft: 8,
     },
     mainControlCard: {
         flex: 1,
