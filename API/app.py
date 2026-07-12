@@ -17,6 +17,9 @@ DATABASE_PATH = os.getenv(
 )
 DEFAULT_TEMPERATURE = 25.5
 NOTIFICATION_DEDUPE_MINUTES = 5
+DEFAULT_DEVICE_ID = os.getenv("URBANGROW_DEFAULT_DEVICE_ID", "esp32-main")
+ESP_HTTP_CONTROL_URL = os.getenv("URBANGROW_ESP_HTTP_CONTROL_URL", "").strip()
+MQTT_COMMAND_TOPIC = os.getenv("URBANGROW_MQTT_COMMAND_TOPIC", "urbangrow/actuator/commands")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 AGRIBOT_SYSTEM_PROMPT = (
@@ -94,6 +97,38 @@ def init_db() -> None:
                 timestamp TEXT NOT NULL,
                 is_read INTEGER NOT NULL DEFAULT 0,
                 is_cleared INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS actuator_commands (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL,
+                actuator_key TEXT NOT NULL CHECK (actuator_key IN ('pumpStatus', 'lightStatus')),
+                target_value TEXT NOT NULL CHECK (target_value IN ('ON', 'OFF')),
+                status TEXT NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
+                delivery_method TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                error_message TEXT,
+                requested_by TEXT NOT NULL,
+                requested_at TEXT NOT NULL,
+                delivered_at TEXT,
+                completed_at TEXT
+            )
+            """
+        )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS actuator_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                command_id INTEGER,
+                actuator_key TEXT NOT NULL,
+                target_value TEXT NOT NULL,
+                status TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                FOREIGN KEY(command_id) REFERENCES actuator_commands(id)
             )
             """
         )
@@ -259,33 +294,316 @@ def get_actuator_status() -> dict[str, Any]:
     return dict(row)
 
 
-def update_actuator_status(data: dict[str, Any]) -> dict[str, Any]:
+def actuator_label(key: str) -> str:
+    return "Pompa Air" if key == "pumpStatus" else "Lampu Grow"
+
+
+def actuator_icon(key: str) -> str:
+    return "droplet" if key == "pumpStatus" else "sun"
+
+
+def validate_actuator_control_payload(data: dict[str, Any]) -> tuple[str, str, str, str]:
     key = data.get("key")
     value = data.get("value")
 
     if key not in {"pumpStatus", "lightStatus"} or value not in {"ON", "OFF"}:
         raise ValueError("Permintaan kontrol aktuator tidak valid.")
 
+    device_id = str(data.get("device_id") or DEFAULT_DEVICE_ID).strip() or DEFAULT_DEVICE_ID
+    requested_by = str(data.get("requested_by") or "mobile-app").strip() or "mobile-app"
+
+    return key, value, device_id, requested_by
+
+
+def command_payload(command: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "command_id": command["id"],
+        "device_id": command["device_id"],
+        "key": command["actuator_key"],
+        "value": command["target_value"],
+        "mqtt_topic": MQTT_COMMAND_TOPIC,
+        "requested_at": command["requested_at"],
+    }
+
+
+def log_actuator_event(
+    command_id: int | None,
+    key: str,
+    value: str,
+    status: str,
+    message: str,
+) -> None:
+    with get_db() as db:
+        db.execute(
+            """
+            INSERT INTO actuator_logs
+                (command_id, actuator_key, target_value, status, message, timestamp)
+            VALUES
+                (?, ?, ?, ?, ?, ?)
+            """,
+            (command_id, key, value, status, message, utc_now()),
+        )
+
+
+def row_to_actuator_command(row: sqlite3.Row) -> dict[str, Any]:
+    command = dict(row)
+    command["payload"] = command_payload(command)
+    return command
+
+
+def get_actuator_command(command_id: int) -> dict[str, Any] | None:
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT id, device_id, actuator_key, target_value, status, delivery_method,
+                   attempts, error_message, requested_by, requested_at, delivered_at, completed_at
+            FROM actuator_commands
+            WHERE id = ?
+            """,
+            (command_id,),
+        ).fetchone()
+
+    return row_to_actuator_command(row) if row is not None else None
+
+
+def list_actuator_commands(limit: int = 20, status: str | None = None) -> list[dict[str, Any]]:
+    limit = max(1, min(limit, 100))
+    params: list[Any] = []
+    where_clause = ""
+
+    if status in {"pending", "success", "failed"}:
+        where_clause = "WHERE status = ?"
+        params.append(status)
+
+    params.append(limit)
+
+    with get_db() as db:
+        rows = db.execute(
+            f"""
+            SELECT id, device_id, actuator_key, target_value, status, delivery_method,
+                   attempts, error_message, requested_by, requested_at, delivered_at, completed_at
+            FROM actuator_commands
+            {where_clause}
+            ORDER BY requested_at DESC, id DESC
+            LIMIT ?
+            """,
+            params,
+        ).fetchall()
+
+    return [row_to_actuator_command(row) for row in rows]
+
+
+def list_actuator_logs(limit: int = 50) -> list[dict[str, Any]]:
+    limit = max(1, min(limit, 100))
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, command_id, actuator_key, target_value, status, message, timestamp
+            FROM actuator_logs
+            ORDER BY timestamp DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [dict(row) for row in rows]
+
+
+def create_actuator_command(data: dict[str, Any]) -> dict[str, Any]:
+    key, value, device_id, requested_by = validate_actuator_control_payload(data)
+    created_at = utc_now()
+    delivery_method = "http" if ESP_HTTP_CONTROL_URL else "queue"
+
+    with get_db() as db:
+        cursor = db.execute(
+            """
+            INSERT INTO actuator_commands
+                (device_id, actuator_key, target_value, status, delivery_method, requested_by, requested_at)
+            VALUES
+                (?, ?, ?, 'pending', ?, ?, ?)
+            """,
+            (device_id, key, value, delivery_method, requested_by, created_at),
+        )
+
+    command_id = int(cursor.lastrowid)
+    log_actuator_event(
+        command_id,
+        key,
+        value,
+        "pending",
+        f"{actuator_label(key)} menunggu eksekusi perangkat {device_id}.",
+    )
+
+    command = get_actuator_command(command_id)
+    if command is None:
+        raise RuntimeError("Command aktuator gagal dibuat.")
+
+    if ESP_HTTP_CONTROL_URL:
+        return dispatch_actuator_command(command)
+
+    return command
+
+
+def apply_actuator_success(key: str, value: str) -> dict[str, Any]:
+    updated_at = utc_now()
     with get_db() as db:
         db.execute(
             f"UPDATE actuator_status SET {key} = ?, updated_at = ? WHERE id = 1",
-            (value, utc_now()),
+            (value, updated_at),
         )
         row = db.execute(
             "SELECT pumpStatus, lightStatus, updated_at FROM actuator_status WHERE id = 1"
         ).fetchone()
 
-    actuator_label = "Pompa Air" if key == "pumpStatus" else "Lampu Grow"
-    actuator_icon = "droplet" if key == "pumpStatus" else "sun"
     insert_notification(
-        f"{actuator_label} Diubah",
-        f"{actuator_label} disetel ke {value} dari kontrol aplikasi.",
+        f"{actuator_label(key)} Diubah",
+        f"{actuator_label(key)} berhasil disetel ke {value} oleh perangkat fisik.",
         "info",
-        actuator_icon,
+        actuator_icon(key),
+        updated_at,
         dedupe_minutes=None,
     )
 
     return dict(row)
+
+
+def update_actuator_command_status(
+    command_id: int,
+    status: str,
+    message: str = "",
+) -> dict[str, Any]:
+    if status not in {"success", "failed"}:
+        raise ValueError("Status command harus success atau failed.")
+
+    command = get_actuator_command(command_id)
+    if command is None:
+        raise ValueError("Command aktuator tidak ditemukan.")
+
+    completed_at = utc_now()
+    with get_db() as db:
+        db.execute(
+            """
+            UPDATE actuator_commands
+            SET status = ?, error_message = ?, completed_at = ?
+            WHERE id = ?
+            """,
+            (status, message or None, completed_at, command_id),
+        )
+
+    if status == "success":
+        apply_actuator_success(command["actuator_key"], command["target_value"])
+
+    log_actuator_event(
+        command_id,
+        command["actuator_key"],
+        command["target_value"],
+        status,
+        message or f"Command aktuator {status}.",
+    )
+
+    updated_command = get_actuator_command(command_id)
+    if updated_command is None:
+        raise ValueError("Command aktuator tidak ditemukan.")
+
+    return updated_command
+
+
+def dispatch_actuator_command(command: dict[str, Any]) -> dict[str, Any]:
+    payload = command_payload(command)
+    request_body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        ESP_HTTP_CONTROL_URL,
+        data=request_body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            response_text = response.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError) as exc:
+        return mark_dispatched_command_failed(command, f"Gagal mengirim HTTP ke ESP: {exc}")
+
+    response_status = "success"
+    response_message = "ESP menerima dan menjalankan command melalui HTTP."
+
+    if response_text.strip():
+        try:
+            response_payload = json.loads(response_text)
+            response_status = str(response_payload.get("status", response_status)).lower()
+            response_message = str(response_payload.get("message", response_message))
+        except json.JSONDecodeError:
+            response_message = response_text.strip()
+
+    if response_status not in {"success", "failed"}:
+        response_status = "success"
+
+    return mark_dispatched_command_complete(command, response_status, response_message)
+
+
+def mark_dispatched_command_complete(
+    command: dict[str, Any],
+    status: str,
+    message: str,
+) -> dict[str, Any]:
+    delivered_at = utc_now()
+    with get_db() as db:
+        db.execute(
+            """
+            UPDATE actuator_commands
+            SET attempts = attempts + 1, delivered_at = ?
+            WHERE id = ?
+            """,
+            (delivered_at, command["id"]),
+        )
+
+    return update_actuator_command_status(command["id"], status, message)
+
+
+def mark_dispatched_command_failed(command: dict[str, Any], message: str) -> dict[str, Any]:
+    delivered_at = utc_now()
+    with get_db() as db:
+        db.execute(
+            """
+            UPDATE actuator_commands
+            SET attempts = attempts + 1, delivered_at = ?, error_message = ?
+            WHERE id = ?
+            """,
+            (delivered_at, message, command["id"]),
+        )
+
+    return update_actuator_command_status(command["id"], "failed", message)
+
+
+def claim_next_actuator_command(device_id: str) -> dict[str, Any] | None:
+    device_id = device_id.strip() or DEFAULT_DEVICE_ID
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT id, device_id, actuator_key, target_value, status, delivery_method,
+                   attempts, error_message, requested_by, requested_at, delivered_at, completed_at
+            FROM actuator_commands
+            WHERE status = 'pending' AND device_id = ?
+            ORDER BY requested_at ASC, id ASC
+            LIMIT 1
+            """,
+            (device_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        db.execute(
+            """
+            UPDATE actuator_commands
+            SET attempts = attempts + 1, delivered_at = ?
+            WHERE id = ?
+            """,
+            (utc_now(), row["id"]),
+        )
+
+    command = get_actuator_command(int(row["id"]))
+    return command
 
 
 def notification_time(timestamp: str | None) -> str:
@@ -746,6 +1064,29 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             self.send_json(200, get_actuator_status())
             return
 
+        if path == "/api/actuator-commands":
+            try:
+                limit = int(query.get("limit", ["20"])[0])
+            except ValueError:
+                limit = 20
+            status = query.get("status", [None])[0]
+            self.send_json(200, list_actuator_commands(limit, status))
+            return
+
+        if path == "/api/actuator-commands/next":
+            device_id = query.get("device_id", [DEFAULT_DEVICE_ID])[0]
+            command = claim_next_actuator_command(device_id)
+            self.send_json(200, {"command": command})
+            return
+
+        if path in {"/api/actuator-logs", "/api/actuator-command-log"}:
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except ValueError:
+                limit = 50
+            self.send_json(200, list_actuator_logs(limit))
+            return
+
         if path == "/api/notifications":
             try:
                 limit = int(query.get("limit", ["50"])[0])
@@ -780,12 +1121,42 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
 
         if path == "/api/actuator-control":
             try:
-                status = update_actuator_status(payload)
+                command = create_actuator_command(payload)
             except ValueError as exc:
                 self.send_json(400, {"error": str(exc)})
                 return
+            except RuntimeError as exc:
+                self.send_json(500, {"error": str(exc)})
+                return
 
-            self.send_json(200, status)
+            self.send_json(
+                202 if command["status"] == "pending" else 200,
+                {
+                    "message": "Command aktuator dibuat.",
+                    "command": command,
+                    "actuator": get_actuator_status(),
+                },
+            )
+            return
+
+        if path in {"/api/actuator-commands/ack", "/api/actuator-command-ack"}:
+            try:
+                command_id = int(payload.get("command_id", payload.get("id")))
+                status = str(payload.get("status", "")).lower()
+                message = str(payload.get("message", "")).strip()
+                command = update_actuator_command_status(command_id, status, message)
+            except (TypeError, ValueError) as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+
+            self.send_json(
+                200,
+                {
+                    "message": "Ack command aktuator diterima.",
+                    "command": command,
+                    "actuator": get_actuator_status(),
+                },
+            )
             return
 
         if path == "/api/notifications/clear":

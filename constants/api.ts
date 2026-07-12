@@ -46,6 +46,37 @@ export interface ActuatorStatus {
   lightStatus: ActuatorValue;
 }
 
+export type ActuatorCommandStatus = 'pending' | 'success' | 'failed';
+
+export interface ActuatorCommand {
+  id: number;
+  device_id: string;
+  actuator_key: ActuatorKey;
+  target_value: ActuatorValue;
+  status: ActuatorCommandStatus;
+  delivery_method: 'queue' | 'http' | string;
+  attempts: number;
+  error_message?: string | null;
+  requested_by: string;
+  requested_at: string;
+  delivered_at?: string | null;
+  completed_at?: string | null;
+  payload?: {
+    command_id: number;
+    device_id: string;
+    key: ActuatorKey;
+    value: ActuatorValue;
+    mqtt_topic: string;
+    requested_at: string;
+  };
+}
+
+export interface ActuatorControlResponse {
+  message: string;
+  command: ActuatorCommand;
+  actuator: ActuatorStatus;
+}
+
 export const apiGet = async <T,>(path: string): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`);
 

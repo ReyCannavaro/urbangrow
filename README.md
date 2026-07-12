@@ -148,8 +148,13 @@ npm run web
 | `GET` | `/api/sensor-history?limit=12` | Ambil riwayat sensor |
 | `GET` | `/api/sensor-log` | Alias riwayat sensor |
 | `GET` | `/api/actuator-status` | Ambil status pompa/lampu |
-| `POST` | `/api/actuator-control` | Ubah status aktuator |
+| `POST` | `/api/actuator-control` | Buat command kontrol aktuator |
+| `GET` | `/api/actuator-commands?limit=20` | Ambil riwayat command aktuator |
+| `GET` | `/api/actuator-commands/next?device_id=esp32-main` | ESP mengambil command pending berikutnya |
+| `POST` | `/api/actuator-commands/ack` | ESP mengirim hasil eksekusi command |
+| `GET` | `/api/actuator-logs?limit=50` | Ambil log perubahan aktuator |
 | `GET` | `/api/notifications` | Ambil notifikasi real |
+| `POST` | `/api/notifications/clear` | Bersihkan riwayat notifikasi |
 | `POST` | `/api/chat` | Kirim pesan ke AgriBot |
 
 ## Contoh Request Sensor
@@ -176,6 +181,57 @@ Contoh kontrol aktuator:
 curl.exe -X POST http://localhost:5000/api/actuator-control `
   -H "Content-Type: application/json" `
   -d "{\"key\":\"pumpStatus\",\"value\":\"ON\"}"
+```
+
+## Integrasi Aktuator Fisik
+
+Kontrol pompa/lampu sekarang memakai command queue. Saat aplikasi mengirim kontrol, backend membuat command dengan status `pending`, `success`, atau `failed`.
+
+Mode HTTP push langsung ke ESP:
+
+```bash
+set URBANGROW_ESP_HTTP_CONTROL_URL=http://192.168.1.50/actuator
+set URBANGROW_DEFAULT_DEVICE_ID=esp32-main
+python API\app.py
+```
+
+Payload yang dikirim backend ke ESP:
+
+```json
+{
+  "command_id": 1,
+  "device_id": "esp32-main",
+  "key": "pumpStatus",
+  "value": "ON",
+  "mqtt_topic": "urbangrow/actuator/commands",
+  "requested_at": "2026-07-12T06:00:00+00:00"
+}
+```
+
+Mode polling HTTP dari ESP:
+
+```powershell
+curl.exe "http://localhost:5000/api/actuator-commands/next?device_id=esp32-main"
+```
+
+Setelah ESP menjalankan command, kirim ack:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/actuator-commands/ack `
+  -H "Content-Type: application/json" `
+  -d "{\"command_id\":1,\"status\":\"success\",\"message\":\"Pompa menyala\"}"
+```
+
+Jika memakai MQTT bridge, publish payload command ke topic:
+
+```text
+urbangrow/actuator/commands
+```
+
+Topic dapat diubah lewat:
+
+```bash
+set URBANGROW_MQTT_COMMAND_TOPIC=urbangrow/actuator/commands
 ```
 
 ## Validasi

@@ -43,6 +43,18 @@ Optional backend variables:
 set URBANGROW_API_HOST=0.0.0.0
 set URBANGROW_API_PORT=5000
 set GEMINI_API_KEY=your_gemini_api_key_here
+set URBANGROW_ESP_HTTP_CONTROL_URL=http://192.168.1.50/actuator
+set URBANGROW_DEFAULT_DEVICE_ID=esp32-main
+set URBANGROW_MQTT_COMMAND_TOPIC=urbangrow/actuator/commands
 ```
 
 Do not prefix backend secrets with `EXPO_PUBLIC_`.
+
+## ESP Actuator Integration
+
+The backend supports two actuator delivery modes:
+
+- HTTP push: set `URBANGROW_ESP_HTTP_CONTROL_URL`; backend POSTs each command to the ESP.
+- HTTP polling: leave the URL empty; ESP polls `/api/actuator-commands/next?device_id=esp32-main`, executes the command, then POSTs `/api/actuator-commands/ack`.
+
+Command status values are `pending`, `success`, and `failed`. The app only treats the physical actuator state as changed after a command succeeds.
