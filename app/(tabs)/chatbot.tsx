@@ -12,16 +12,12 @@ import {
     TextInput,
     View,
 } from 'react-native';
+import { apiPost } from '@/constants/api';
 
 const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
 const USER_COLOR = '#e0f2fe';
 const BOT_LOADING_COLOR = '#d1d5db';
 const BOT_ACTIVE_COLOR = '#3b82f6';
-
-const apiKey = "AIzaSyB4fPH8rZHYFT9YZ4qcUxBosKlkm8bqpGk";
-const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-const systemPrompt = "Anda adalah AgriBot, asisten ahli Aquaponik, Hidroponik dan Urban Farming. Peran Anda HANYA TERBATAS pada menjawab pertanyaan seputar: **Aquaponik**, **Hidroponik**, **Urban Farming**, **Pertanian Perkotaan**, **Kualitas Air**, **Nutrisi Tanaman/Ikan**, dan **Pemeliharaan Sistem Pertanian**. Selalu balas dalam Bahasa Indonesia. Jika pertanyaan tidak relevan dengan topik-topik tersebut (contoh: politik, olahraga, hiburan), Anda HARUS menolak dengan sopan dan mengingatkan pengguna bahwa Anda hanya dapat membantu dalam konteks pertanian. Jawaban harus informatif, ringkas, dan relevan. Pastikan setiap poin penting atau judul sub-bagian menggunakan format **bold** agar mudah dibaca. Untuk daftar, gunakan format * atau - di awal baris.";
 
 interface Message {
     id: number | string;
@@ -36,6 +32,10 @@ const initialMessage: Message = {
 };
 
 const SuggestedQuestions = ['Bagaimana cara menanam yang baik ?', 'Tentang tanaman rumah', 'Apa itu aquaponik?', 'Bagaimana cara mengatur pH air?', 'Bagaimana cara mengendalikan hama?', 'Apa itu hidroponik?'];
+
+interface ChatResponse {
+    reply: string;
+}
 
 const AdvancedMessageParser: React.FC<{ content: string; style: any }> = ({ content, style }) => {
     const parseBold = (text: string, keyPrefix: string) => {
@@ -150,29 +150,11 @@ const ChatbotPage: React.FC = () => {
     }, [messages]);
 
     const callGeminiAPI = async (query: string): Promise<string> => {
-        const payload = {
-            contents: [{ parts: [{ text: query }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            tools: [{ "google_search": {} }],
-        };
-
         const maxRetries = 3;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API returned status ${response.status}`);
-                }
-
-                const result = await response.json();
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-                return text || "Maaf, AgriBot tidak dapat menghasilkan balasan yang relevan.";
+                const result = await apiPost<ChatResponse>('/api/chat', { message: query });
+                return result.reply || "Maaf, AgriBot tidak dapat menghasilkan balasan yang relevan.";
 
             } catch (error) {
                 console.error(`Attempt ${attempt + 1} failed:`, error);

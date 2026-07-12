@@ -1,6 +1,8 @@
 import json
 import os
 import sqlite3
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
@@ -14,10 +16,39 @@ DATABASE_PATH = os.getenv(
     os.path.join(os.path.dirname(__file__), "urban_grow.db"),
 )
 DEFAULT_TEMPERATURE = 25.5
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+AGRIBOT_SYSTEM_PROMPT = (
+    "Anda adalah AgriBot, asisten ahli Aquaponik, Hidroponik dan Urban Farming. "
+    "Peran Anda HANYA TERBATAS pada menjawab pertanyaan seputar Aquaponik, "
+    "Hidroponik, Urban Farming, Pertanian Perkotaan, Kualitas Air, Nutrisi "
+    "Tanaman/Ikan, dan Pemeliharaan Sistem Pertanian. Selalu balas dalam Bahasa "
+    "Indonesia. Jika pertanyaan tidak relevan dengan topik-topik tersebut, tolak "
+    "dengan sopan dan ingatkan pengguna bahwa Anda hanya dapat membantu dalam "
+    "konteks pertanian. Jawaban harus informatif, ringkas, dan relevan. Pastikan "
+    "setiap poin penting atau judul sub-bagian menggunakan format **bold** agar "
+    "mudah dibaca. Untuk daftar, gunakan format * atau - di awal baris."
+)
 
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+
+    try:
+        normalized_value = value.replace("Z", "+00:00")
+        parsed_value = datetime.fromisoformat(normalized_value)
+    except ValueError:
+        return None
+
+    if parsed_value.tzinfo is None:
+        return parsed_value.replace(tzinfo=timezone.utc)
+
+    return parsed_value.astimezone(timezone.utc)
 
 
 def get_db() -> sqlite3.Connection:
@@ -229,6 +260,234 @@ def update_actuator_status(data: dict[str, Any]) -> dict[str, Any]:
     return dict(row)
 
 
+def notification_time(timestamp: str | None) -> str:
+    parsed_time = parse_timestamp(timestamp)
+    if parsed_time is None:
+        return datetime.now().strftime("%H:%M")
+
+    return parsed_time.astimezone().strftime("%H:%M")
+
+
+def create_notification(
+    notification_id: int,
+    title: str,
+    message: str,
+    notification_type: str,
+    icon: str,
+    timestamp: str | None,
+) -> dict[str, Any]:
+    return {
+        "id": notification_id,
+        "title": title,
+        "message": message,
+        "type": notification_type,
+        "icon": icon,
+        "time": notification_time(timestamp),
+        "date": "Hari Ini",
+    }
+
+
+def get_notifications() -> list[dict[str, Any]]:
+    latest_reading = get_latest_reading()
+    actuator_status = get_actuator_status()
+    notifications: list[dict[str, Any]] = []
+    next_id = 1
+
+    timestamp = latest_reading.get("timestamp")
+    parsed_timestamp = parse_timestamp(timestamp)
+    data_source = latest_reading.get("source")
+
+    if parsed_timestamp is None or data_source == "default":
+        notifications.append(
+            create_notification(
+                next_id,
+                "Belum Ada Data Sensor",
+                "API belum menerima data sensor asli. Dashboard masih memakai nilai default.",
+                "warning",
+                "wifi-off",
+                timestamp,
+            )
+        )
+        next_id += 1
+    else:
+        minutes_since_update = (datetime.now(timezone.utc) - parsed_timestamp).total_seconds() / 60
+        if minutes_since_update > 5:
+            notifications.append(
+                create_notification(
+                    next_id,
+                    "Sensor Tidak Update",
+                    f"Data sensor terakhir diterima sekitar {int(minutes_since_update)} menit lalu.",
+                    "critical",
+                    "wifi-off",
+                    timestamp,
+                )
+            )
+            next_id += 1
+
+    temperature = float(latest_reading.get("temperature", DEFAULT_TEMPERATURE))
+    ph = float(latest_reading.get("ph", 6.8))
+    ldr_value = int(latest_reading.get("ldr_value", 450))
+
+    if ph < 6.0:
+        notifications.append(
+            create_notification(
+                next_id,
+                "PH Kritis Rendah",
+                f"Kadar pH air berada di {ph:.2f}. Segera naikkan pH agar ikan dan tanaman tetap aman.",
+                "critical",
+                "alert-triangle",
+                timestamp,
+            )
+        )
+        next_id += 1
+    elif ph > 7.5:
+        notifications.append(
+            create_notification(
+                next_id,
+                "PH Terlalu Basa",
+                f"Kadar pH air berada di {ph:.2f}. Koreksi pH agar nutrisi tetap mudah diserap.",
+                "warning",
+                "droplet",
+                timestamp,
+            )
+        )
+        next_id += 1
+
+    if temperature > 30:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Suhu Air Tinggi",
+                f"Suhu air mencapai {temperature:.1f} derajat C. Pertimbangkan pendinginan atau sirkulasi tambahan.",
+                "warning",
+                "thermometer",
+                timestamp,
+            )
+        )
+        next_id += 1
+    elif temperature < 20:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Suhu Air Rendah",
+                f"Suhu air turun ke {temperature:.1f} derajat C. Periksa lingkungan kolam dan stabilkan suhu.",
+                "warning",
+                "thermometer",
+                timestamp,
+            )
+        )
+        next_id += 1
+
+    if ldr_value < 300:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Cahaya Rendah",
+                f"Nilai LDR {ldr_value}. Lampu grow perlu aktif agar tanaman tetap mendapat cahaya.",
+                "info",
+                "sun",
+                timestamp,
+            )
+        )
+        next_id += 1
+
+    if actuator_status.get("pumpStatus") == "ON":
+        notifications.append(
+            create_notification(
+                next_id,
+                "Pompa Air Aktif",
+                "Pompa sedang ON untuk menjaga sirkulasi dan menstabilkan kualitas air.",
+                "info",
+                "droplet",
+                actuator_status.get("updated_at", timestamp),
+            )
+        )
+        next_id += 1
+
+    if actuator_status.get("lightStatus") == "ON":
+        notifications.append(
+            create_notification(
+                next_id,
+                "Lampu Grow Aktif",
+                "Lampu grow sedang ON karena intensitas cahaya terdeteksi rendah.",
+                "info",
+                "sun",
+                actuator_status.get("updated_at", timestamp),
+            )
+        )
+
+    if not notifications:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Sistem Stabil",
+                "Suhu, pH, cahaya, dan aktuator berada dalam kondisi aman.",
+                "info",
+                "check-circle",
+                timestamp,
+            )
+        )
+
+    return notifications
+
+
+def get_gemini_api_key() -> str | None:
+    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
+
+
+def extract_gemini_text(response_payload: dict[str, Any]) -> str:
+    candidates = response_payload.get("candidates", [])
+    if not candidates:
+        return "Maaf, AgriBot tidak dapat menghasilkan balasan yang relevan."
+
+    parts = candidates[0].get("content", {}).get("parts", [])
+    text_parts = [part.get("text", "") for part in parts if part.get("text")]
+    text = "\n".join(text_parts).strip()
+
+    return text or "Maaf, AgriBot tidak dapat menghasilkan balasan yang relevan."
+
+
+def generate_chat_reply(message: str) -> str:
+    gemini_api_key = get_gemini_api_key()
+    if not gemini_api_key:
+        return (
+            "Gemini API key belum dikonfigurasi di backend. "
+            "Set environment variable GEMINI_API_KEY atau GOOGLE_GENERATIVE_AI_API_KEY, "
+            "lalu jalankan ulang API UrbanGrow."
+        )
+
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": message}]}],
+        "systemInstruction": {"parts": [{"text": AGRIBOT_SYSTEM_PROMPT}]},
+    }
+    request_body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        GEMINI_API_URL,
+        data=request_body,
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": gemini_api_key,
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="replace")
+        print(f"[ERROR] Gemini API HTTP {exc.code}: {error_body}")
+        return "AgriBot belum dapat menghubungi Gemini. Periksa API key, model, atau kuota layanan."
+    except (urllib.error.URLError, TimeoutError) as exc:
+        print(f"[ERROR] Gemini API network error: {exc}")
+        return "AgriBot saat ini tidak dapat terhubung ke layanan Gemini. Periksa koneksi internet backend."
+    except json.JSONDecodeError as exc:
+        print(f"[ERROR] Gemini API invalid JSON response: {exc}")
+        return "AgriBot menerima respons tidak valid dari Gemini."
+
+    return extract_gemini_text(response_payload)
+
+
 class UrbanGrowHandler(BaseHTTPRequestHandler):
     def send_json(self, status_code: int, payload: Any) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -273,6 +532,10 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             self.send_json(200, get_actuator_status())
             return
 
+        if path == "/api/notifications":
+            self.send_json(200, get_notifications())
+            return
+
         self.send_json(404, {"error": "Endpoint tidak ditemukan."})
 
     def do_POST(self) -> None:
@@ -305,6 +568,15 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
                 return
 
             self.send_json(200, status)
+            return
+
+        if path == "/api/chat":
+            message = str(payload.get("message", "")).strip()
+            if not message:
+                self.send_json(400, {"error": "message wajib diisi."})
+                return
+
+            self.send_json(200, {"reply": generate_chat_reply(message)})
             return
 
         self.send_json(404, {"error": "Endpoint tidak ditemukan."})

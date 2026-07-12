@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { API_BASE_URL, ActuatorStatus, apiGet, normalizeActuatorStatus } from '@/constants/api';
 
 const Feather = { 
     name: 'Feather', 
@@ -29,8 +30,6 @@ const LinearGradient = ({ colors, start, end, style, children }: any) => {
     return <View style={[style, gradientStyle]}>{children}</View>;
 };
 
-const API_BASE_URL = 'http://10.249.160.45:5000';
-
 interface SensorData {
     temperature: number;
     ph: number;
@@ -38,9 +37,9 @@ interface SensorData {
     timestamp: string;
 }
 
-interface ActuatorStatus {
-    pumpStatus: 'ON' | 'OFF';
-    lightStatus: 'ON' | 'OFF';
+interface SensorTrend {
+    label: string;
+    color: string;
 }
 
 let simulatedSensorData: SensorData = { temperature: 25.5, ph: 6.8, ldr_value: 450, timestamp: new Date().toISOString() };
@@ -77,16 +76,6 @@ const simulateNewData = (currentSensorData: SensorData, currentActuatorStatus: A
     return { sensor: newSensorData, actuator: newActuatorStatus };
 };
 
-const fetchJson = async <T,>(path: string): Promise<T> => {
-    const response = await fetch(`${API_BASE_URL}${path}`);
-
-    if (!response.ok) {
-        throw new Error(`API ${path} returned status ${response.status}`);
-    }
-
-    return response.json();
-};
-
 const normalizeSensorData = (payload: any): SensorData => ({
     temperature: Number(payload.temperature ?? 0),
     ph: Number(payload.ph ?? 0),
@@ -94,11 +83,35 @@ const normalizeSensorData = (payload: any): SensorData => ({
     timestamp: payload.timestamp ?? new Date().toISOString(),
 });
 
-const normalizeActuatorStatus = (payload: any): ActuatorStatus => ({
-    pumpStatus: payload.pumpStatus === 'ON' ? 'ON' : 'OFF',
-    lightStatus: payload.lightStatus === 'ON' ? 'ON' : 'OFF',
-});
+const normalizeSensorHistory = (payload: any[]): SensorData[] => (
+    payload.map(normalizeSensorData).reverse()
+);
 
+const getTrend = (history: SensorData[], key: 'temperature' | 'ph'): SensorTrend => {
+    if (history.length < 2) {
+        return { label: 'Belum cukup data', color: '#6b7280' };
+    }
+
+    const firstValue = history[0][key];
+    const lastValue = history[history.length - 1][key];
+    const delta = lastValue - firstValue;
+    const threshold = key === 'temperature' ? 0.2 : 0.05;
+
+    if (delta > threshold) {
+        return { label: 'Naik', color: '#f59e0b' };
+    }
+
+    if (delta < -threshold) {
+        return { label: 'Turun', color: '#3b82f6' };
+    }
+
+    return { label: 'Stabil', color: '#10b981' };
+};
+
+const formatHistoryTime = (timestamp: string): string => {
+    const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+    return new Date(timestamp).toLocaleTimeString('id-ID', timeOptions);
+};
 
 interface DataCardProps {
     title: string;
@@ -253,8 +266,100 @@ const StatusButton: React.FC<StatusButtonProps> = ({ label, value, borderColor }
     </View> 
 ); 
 
+interface MiniBarChartProps {
+    history: SensorData[];
+    metric: 'temperature' | 'ph';
+    color: string;
+    minValue: number;
+    maxValue: number;
+}
+
+const MiniBarChart: React.FC<MiniBarChartProps> = ({ history, metric, color, minValue, maxValue }) => {
+    const chartData = history.slice(-8);
+    const range = Math.max(maxValue - minValue, 1);
+
+    if (chartData.length === 0) {
+        return (
+            <View style={styles.emptyChart}>
+                <Text style={styles.emptyChartText}>Belum ada riwayat.</Text>
+            </View>
+        );
+    }
+
+    return (
+        <View style={styles.chartRow}>
+            {chartData.map((item, index) => {
+                const value = item[metric];
+                const normalizedValue = Math.max(0, Math.min(1, (value - minValue) / range));
+                const height = 18 + normalizedValue * 52;
+
+                return (
+                    <View key={`${metric}-${item.timestamp}-${index}`} style={styles.chartBarWrapper}>
+                        <View style={[styles.chartBar, { height, backgroundColor: color }]} />
+                    </View>
+                );
+            })}
+        </View>
+    );
+};
+
+const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: boolean }> = ({ history, isConnected }) => {
+    const latestRows = history.slice(-5).reverse();
+    const tempTrend = getTrend(history, 'temperature');
+    const phTrend = getTrend(history, 'ph');
+
+    return (
+        <View style={styles.historyCard}>
+            <View style={styles.historyHeader}>
+                <View>
+                    <Text style={styles.historyTitle}>Riwayat Sensor</Text>
+                    <Text style={styles.historySubtitle}>{isConnected ? 'Data API terakhir' : 'Mode simulasi lokal'}</Text>
+                </View>
+                <Text style={[styles.cardNormalLabel, { borderColor: isConnected ? '#10b981' : '#ef4444', color: isConnected ? '#10b981' : '#ef4444', backgroundColor: '#fff' }]}>
+                    {history.length} Data
+                </Text>
+            </View>
+
+            <View style={styles.trendGrid}>
+                <View style={styles.trendBox}>
+                    <Text style={styles.trendLabel}>Tren Suhu</Text>
+                    <Text style={[styles.trendValue, { color: tempTrend.color }]}>{tempTrend.label}</Text>
+                    <MiniBarChart history={history} metric="temperature" color="#3b82f6" minValue={15} maxValue={35} />
+                </View>
+                <View style={styles.trendBox}>
+                    <Text style={styles.trendLabel}>Tren pH</Text>
+                    <Text style={[styles.trendValue, { color: phTrend.color }]}>{phTrend.label}</Text>
+                    <MiniBarChart history={history} metric="ph" color="#10b981" minValue={4} maxValue={9} />
+                </View>
+            </View>
+
+            <View style={styles.historyTable}>
+                <View style={styles.historyTableHeader}>
+                    <Text style={[styles.historyCell, styles.historyHeaderCell]}>Waktu</Text>
+                    <Text style={[styles.historyCell, styles.historyHeaderCell]}>Suhu</Text>
+                    <Text style={[styles.historyCell, styles.historyHeaderCell]}>pH</Text>
+                    <Text style={[styles.historyCell, styles.historyHeaderCell]}>LDR</Text>
+                </View>
+                {latestRows.length === 0 ? (
+                    <Text style={styles.historyEmptyText}>Belum ada riwayat sensor.</Text>
+                ) : (
+                    latestRows.map((item, index) => (
+                        <View key={`${item.timestamp}-${index}`} style={styles.historyTableRow}>
+                            <Text style={styles.historyCell}>{formatHistoryTime(item.timestamp)}</Text>
+                            <Text style={styles.historyCell}>{item.temperature.toFixed(1)}°C</Text>
+                            <Text style={styles.historyCell}>{item.ph.toFixed(2)}</Text>
+                            <Text style={styles.historyCell}>{item.ldr_value}</Text>
+                        </View>
+                    ))
+                )}
+            </View>
+        </View>
+    );
+};
+
 const HomePage: React.FC = () => {
     const [sensorData, setSensorData] = useState<SensorData>({ temperature: 0.0, ph: 0.0, ldr_value: 0, timestamp: new Date().toISOString() });
+    const [sensorHistory, setSensorHistory] = useState<SensorData[]>([]);
     const [actuatorStatus, setActuatorStatus] = useState<ActuatorStatus>({ pumpStatus: 'OFF', lightStatus: 'OFF' });
     const [isLoading, setIsLoading] = useState(true);
     const [isConnected, setIsConnected] = useState(false);
@@ -278,15 +383,18 @@ const HomePage: React.FC = () => {
 
     const fetchData = useCallback(async () => {
         try {
-            const [latestReading, actuatorData] = await Promise.all([
-                fetchJson<SensorData>('/api/latest-reading'),
-                fetchJson<ActuatorStatus>('/api/actuator-status'),
+            const [latestReading, actuatorData, historyData] = await Promise.all([
+                apiGet<SensorData>('/api/latest-reading'),
+                apiGet<ActuatorStatus>('/api/actuator-status'),
+                apiGet<SensorData[]>('/api/sensor-history?limit=12'),
             ]);
 
             const sensor = normalizeSensorData(latestReading);
             const actuator = normalizeActuatorStatus(actuatorData);
+            const history = normalizeSensorHistory(historyData);
 
             setSensorData(sensor);
+            setSensorHistory(history.length ? history : [sensor]);
             setActuatorStatus(actuator);
             setIsConnected(true);
             setErrorMessage('');
@@ -296,6 +404,7 @@ const HomePage: React.FC = () => {
             const { sensor, actuator } = simulateNewData(simulatedSensorData, simulatedActuatorStatus);
 
             setSensorData(sensor);
+            setSensorHistory(prev => [...prev.slice(-11), sensor]);
             setActuatorStatus(actuator);
             setIsConnected(false);
             
@@ -358,6 +467,8 @@ const HomePage: React.FC = () => {
                 </View> 
 
                 <WaterConditionCard currentTemp={currentTemp} currentPh={currentPh} isLoading={isLoading} lastUpdate={sensorData.timestamp} /> 
+
+                <SensorHistoryCard history={sensorHistory} isConnected={isConnected} />
 
                 <View style={styles.statusHeader}> 
                     {Feather.render('zap', 20, '#6366f1', {})}
@@ -518,6 +629,117 @@ const styles = StyleSheet.create({
         fontSize: 24,
         lineHeight: 30,
     }, 
+
+    historyCard: {
+        width: '100%',
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderColor: '#e5e7eb',
+        borderRadius: 15,
+        padding: 15,
+        marginBottom: 20,
+    },
+    historyHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
+    },
+    historyTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#1f2937',
+    },
+    historySubtitle: {
+        fontSize: 12,
+        color: '#6b7280',
+        marginTop: 3,
+    },
+    trendGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+    },
+    trendBox: {
+        width: '48.5%',
+        borderWidth: 1,
+        borderColor: '#f3f4f6',
+        borderRadius: 12,
+        padding: 10,
+        backgroundColor: '#f9fafb',
+    },
+    trendLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+        fontWeight: '600',
+    },
+    trendValue: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginTop: 2,
+        marginBottom: 8,
+    },
+    chartRow: {
+        height: 74,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+    },
+    chartBarWrapper: {
+        flex: 1,
+        height: 74,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginHorizontal: 1,
+    },
+    chartBar: {
+        width: 8,
+        borderRadius: 4,
+        opacity: 0.85,
+    },
+    emptyChart: {
+        height: 74,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyChartText: {
+        fontSize: 12,
+        color: '#9ca3af',
+        textAlign: 'center',
+    },
+    historyTable: {
+        borderWidth: 1,
+        borderColor: '#f3f4f6',
+        borderRadius: 12,
+        overflow: 'hidden',
+    },
+    historyTableHeader: {
+        flexDirection: 'row',
+        backgroundColor: '#f3f4f6',
+        paddingVertical: 8,
+    },
+    historyTableRow: {
+        flexDirection: 'row',
+        paddingVertical: 9,
+        borderTopWidth: 1,
+        borderTopColor: '#f3f4f6',
+    },
+    historyCell: {
+        flex: 1,
+        color: '#4b5563',
+        fontSize: 12,
+        textAlign: 'center',
+    },
+    historyHeaderCell: {
+        color: '#374151',
+        fontWeight: 'bold',
+    },
+    historyEmptyText: {
+        color: '#9ca3af',
+        fontSize: 13,
+        textAlign: 'center',
+        paddingVertical: 16,
+    },
 
     statusHeader: { 
         flexDirection: 'row', 
