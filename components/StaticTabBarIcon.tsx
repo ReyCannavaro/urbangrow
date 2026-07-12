@@ -26,8 +26,8 @@ interface StaticTabBarIconProps {
 }
 
 export function StaticTabBarIcon({ name, focused }: StaticTabBarIconProps) {
-  const activeColor = AppTheme.color.surfaceStrong;
-  const inactiveColor = AppTheme.color.textOnGlassMuted;
+  const activeColor = AppTheme.color.primaryDark;
+  const inactiveColor = AppTheme.color.textSubtle;
 
   const iconWrapperStyle = focused ? styles.iconWrapperActive : styles.iconWrapperInactive;
 
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   iconWrapperActive: {
     backgroundColor: AppTheme.color.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.34)',
+    borderColor: AppTheme.color.lineStrong,
   },
   iconWrapperInactive: {
     backgroundColor: 'transparent',

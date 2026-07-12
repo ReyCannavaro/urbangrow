@@ -14,15 +14,15 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarShowLabel: true,
-          tabBarActiveTintColor: AppTheme.color.primarySoft,
-          tabBarInactiveTintColor: '#9fb1a8',
+          tabBarActiveTintColor: AppTheme.color.primaryDark,
+          tabBarInactiveTintColor: AppTheme.color.textSubtle,
           tabBarLabelStyle: styles.tabBarLabel,
           tabBarItemStyle: styles.tabBarItem,
           tabBarStyle: styles.tabBar,
           tabBarBackground: () => (
             <BlurView
               intensity={82}
-              tint="dark"
+              tint="light"
               experimentalBlurMethod="dimezisBlurView"
               style={StyleSheet.absoluteFill}
             />
@@ -76,9 +76,9 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     height: 76,
-    backgroundColor: 'rgba(8, 24, 18, 0.36)',
+    backgroundColor: 'rgba(255,255,255,0.62)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.18)',
+    borderTopColor: 'rgba(10,95,69,0.10)',
     position: 'absolute',
     bottom: 12,
     left: 16,
@@ -86,10 +86,10 @@ const styles = StyleSheet.create({
     borderRadius: AppTheme.radius.panel,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: 'rgba(255,255,255,0.86)',
     shadowColor: AppTheme.shadow.color,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.12,
     shadowRadius: 20,
     elevation: 12,
     paddingHorizontal: 8,
