@@ -20,6 +20,22 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def parse_timestamp(value: str | None) -> datetime | None:
+    if not value:
+        return None
+
+    try:
+        normalized_value = value.replace("Z", "+00:00")
+        parsed_value = datetime.fromisoformat(normalized_value)
+    except ValueError:
+        return None
+
+    if parsed_value.tzinfo is None:
+        return parsed_value.replace(tzinfo=timezone.utc)
+
+    return parsed_value.astimezone(timezone.utc)
+
+
 def get_db() -> sqlite3.Connection:
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
@@ -229,6 +245,177 @@ def update_actuator_status(data: dict[str, Any]) -> dict[str, Any]:
     return dict(row)
 
 
+def notification_time(timestamp: str | None) -> str:
+    parsed_time = parse_timestamp(timestamp)
+    if parsed_time is None:
+        return datetime.now().strftime("%H:%M")
+
+    return parsed_time.astimezone().strftime("%H:%M")
+
+
+def create_notification(
+    notification_id: int,
+    title: str,
+    message: str,
+    notification_type: str,
+    icon: str,
+    timestamp: str | None,
+) -> dict[str, Any]:
+    return {
+        "id": notification_id,
+        "title": title,
+        "message": message,
+        "type": notification_type,
+        "icon": icon,
+        "time": notification_time(timestamp),
+        "date": "Hari Ini",
+    }
+
+
+def get_notifications() -> list[dict[str, Any]]:
+    latest_reading = get_latest_reading()
+    actuator_status = get_actuator_status()
+    notifications: list[dict[str, Any]] = []
+    next_id = 1
+
+    timestamp = latest_reading.get("timestamp")
+    parsed_timestamp = parse_timestamp(timestamp)
+    data_source = latest_reading.get("source")
+
+    if parsed_timestamp is None or data_source == "default":
+        notifications.append(
+            create_notification(
+                next_id,
+                "Belum Ada Data Sensor",
+                "API belum menerima data sensor asli. Dashboard masih memakai nilai default.",
+                "warning",
+                "wifi-off",
+                timestamp,
+            )
+        )
+        next_id += 1
+    else:
+        minutes_since_update = (datetime.now(timezone.utc) - parsed_timestamp).total_seconds() / 60
+        if minutes_since_update > 5:
+            notifications.append(
+                create_notification(
+                    next_id,
+                    "Sensor Tidak Update",
+                    f"Data sensor terakhir diterima sekitar {int(minutes_since_update)} menit lalu.",
+                    "critical",
+                    "wifi-off",
+                    timestamp,
+                )
+            )
+            next_id += 1
+
+    temperature = float(latest_reading.get("temperature", DEFAULT_TEMPERATURE))
+    ph = float(latest_reading.get("ph", 6.8))
+    ldr_value = int(latest_reading.get("ldr_value", 450))
+
+    if ph < 6.0:
+        notifications.append(
+            create_notification(
+                next_id,
+                "PH Kritis Rendah",
+                f"Kadar pH air berada di {ph:.2f}. Segera naikkan pH agar ikan dan tanaman tetap aman.",
+                "critical",
+                "alert-triangle",
+                timestamp,
+            )
+        )
+        next_id += 1
+    elif ph > 7.5:
+        notifications.append(
+            create_notification(
+                next_id,
+                "PH Terlalu Basa",
+                f"Kadar pH air berada di {ph:.2f}. Koreksi pH agar nutrisi tetap mudah diserap.",
+                "warning",
+                "droplet",
+                timestamp,
+            )
+        )
+        next_id += 1
+
+    if temperature > 30:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Suhu Air Tinggi",
+                f"Suhu air mencapai {temperature:.1f} derajat C. Pertimbangkan pendinginan atau sirkulasi tambahan.",
+                "warning",
+                "thermometer",
+                timestamp,
+            )
+        )
+        next_id += 1
+    elif temperature < 20:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Suhu Air Rendah",
+                f"Suhu air turun ke {temperature:.1f} derajat C. Periksa lingkungan kolam dan stabilkan suhu.",
+                "warning",
+                "thermometer",
+                timestamp,
+            )
+        )
+        next_id += 1
+
+    if ldr_value < 300:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Cahaya Rendah",
+                f"Nilai LDR {ldr_value}. Lampu grow perlu aktif agar tanaman tetap mendapat cahaya.",
+                "info",
+                "sun",
+                timestamp,
+            )
+        )
+        next_id += 1
+
+    if actuator_status.get("pumpStatus") == "ON":
+        notifications.append(
+            create_notification(
+                next_id,
+                "Pompa Air Aktif",
+                "Pompa sedang ON untuk menjaga sirkulasi dan menstabilkan kualitas air.",
+                "info",
+                "droplet",
+                actuator_status.get("updated_at", timestamp),
+            )
+        )
+        next_id += 1
+
+    if actuator_status.get("lightStatus") == "ON":
+        notifications.append(
+            create_notification(
+                next_id,
+                "Lampu Grow Aktif",
+                "Lampu grow sedang ON karena intensitas cahaya terdeteksi rendah.",
+                "info",
+                "sun",
+                actuator_status.get("updated_at", timestamp),
+            )
+        )
+
+    if not notifications:
+        notifications.append(
+            create_notification(
+                next_id,
+                "Sistem Stabil",
+                "Suhu, pH, cahaya, dan aktuator berada dalam kondisi aman.",
+                "info",
+                "check-circle",
+                timestamp,
+            )
+        )
+
+    return notifications
+
+
 class UrbanGrowHandler(BaseHTTPRequestHandler):
     def send_json(self, status_code: int, payload: Any) -> None:
         body = json.dumps(payload).encode("utf-8")
@@ -271,6 +458,10 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
 
         if path == "/api/actuator-status":
             self.send_json(200, get_actuator_status())
+            return
+
+        if path == "/api/notifications":
+            self.send_json(200, get_notifications())
             return
 
         self.send_json(404, {"error": "Endpoint tidak ditemukan."})

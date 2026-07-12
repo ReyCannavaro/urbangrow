@@ -1,23 +1,23 @@
-import React, { useState } from 'react'; // <--- PERBAIKAN DI SINI: useState ditambahkan
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    ScrollView, 
-    Pressable, 
-    Alert 
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { apiGet } from '@/constants/api';
 
-// Warna Kunci Konsisten
 const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
-const COLOR_DANGER = '#ef4444'; // Merah untuk Peringatan/Kritis
-const COLOR_WARNING = '#facc15'; // Kuning untuk Peringatan Sedang
-const COLOR_INFO = '#3b82f6'; // Biru untuk Informasi
+const COLOR_DANGER = '#ef4444';
+const COLOR_WARNING = '#facc15';
+const COLOR_INFO = '#3b82f6';
 
-// --- Tipe Data dan Data Mock ---
 interface Notification {
     id: number;
     title: string;
@@ -25,25 +25,34 @@ interface Notification {
     type: 'critical' | 'warning' | 'info';
     time: string;
     icon: keyof typeof Feather.glyphMap;
-    date: string; // Untuk pengelompokan
+    date: string;
 }
 
-const mockNotifications: Notification[] = [
-    // Hari Ini
-    { id: 1, title: 'PH Kritis Rendah!', message: 'Kadar pH air terdeteksi 5.9. Segera periksa dan sesuaikan.', type: 'critical', time: '10:30', icon: 'alert-triangle', date: 'Hari Ini' },
-    { id: 2, title: 'Pompa Aktif Otomatis', message: 'Pompa air dihidupkan sesuai jadwal otomatis.', type: 'info', time: '07:00', icon: 'droplet', date: 'Hari Ini' },
-    { id: 3, title: 'Pakan Keluar', message: 'Pakan ikan berhasil dikeluarkan otomatis.', type: 'info', time: '06:00', icon: 'send', date: 'Hari Ini' },
-    
-    // Kemarin
-    { id: 4, title: 'Suhu Tinggi Terdeteksi', message: 'Suhu air mencapai 30.5°C. Pertimbangkan pendinginan.', type: 'warning', time: '18:45', icon: 'thermometer', date: 'Kemarin' },
-    { id: 5, title: 'Koneksi Stabil Kembali', message: 'Koneksi jaringan sistem Aquaponik kembali stabil.', type: 'info', time: '12:15', icon: 'wifi', date: 'Kemarin' },
+const fallbackNotifications: Notification[] = [
+    {
+        id: 1,
+        title: 'API Tidak Terhubung',
+        message: 'Notifikasi real belum dapat dimuat. Pastikan backend UrbanGrow sedang berjalan.',
+        type: 'warning',
+        time: '--:--',
+        icon: 'wifi-off',
+        date: 'Status Sistem',
+    },
 ];
 
-// --- Komponen Kartu Notifikasi ---
+const normalizeNotification = (item: Partial<Notification>, index: number): Notification => ({
+    id: Number(item.id ?? index + 1),
+    title: item.title ?? 'Notifikasi Sistem',
+    message: item.message ?? 'Tidak ada detail tambahan.',
+    type: item.type === 'critical' || item.type === 'warning' || item.type === 'info' ? item.type : 'info',
+    time: item.time ?? '--:--',
+    icon: item.icon ?? 'bell',
+    date: item.date ?? 'Hari Ini',
+});
+
 const NotificationCard: React.FC<{ notification: Notification }> = ({ notification }) => {
     let iconColor;
     let iconBgColor;
-    const iconName = notification.icon;
 
     switch (notification.type) {
         case 'critical':
@@ -65,12 +74,12 @@ const NotificationCard: React.FC<{ notification: Notification }> = ({ notificati
         <Pressable
             style={({ pressed }) => [
                 styles.notifCard,
-                { backgroundColor: pressed ? '#f3f4f6' : '#fff' }
+                { backgroundColor: pressed ? '#f3f4f6' : '#fff' },
             ]}
             onPress={() => Alert.alert(notification.title, notification.message)}
         >
             <View style={[styles.notifIconWrapper, { backgroundColor: iconBgColor }]}>
-                <Feather name={iconName} size={24} color={iconColor} />
+                <Feather name={notification.icon} size={24} color={iconColor} />
             </View>
             <View style={styles.notifContent}>
                 <Text style={[styles.notifTitle, { color: iconColor }]}>{notification.title}</Text>
@@ -81,24 +90,38 @@ const NotificationCard: React.FC<{ notification: Notification }> = ({ notificati
     );
 };
 
-
-// =======================================================
-//                  HALAMAN NOTIFIKASI UTAMA
-// =======================================================
-
 const NotificationsPage: React.FC = () => {
     const insets = useSafeAreaInsets();
-    
-    // State untuk notifikasi (agar bisa dihapus)
-    const [notifications, setNotifications] = useState(mockNotifications);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [errorMessage, setErrorMessage] = useState('');
 
-    // Mengelompokkan notifikasi berdasarkan tanggal
-    const groupedNotifications = notifications.reduce((acc, notif) => {
-        const date = notif.date;
-        if (!acc[date]) {
-            acc[date] = [];
+    const fetchNotifications = useCallback(async () => {
+        setIsLoading(true);
+
+        try {
+            const response = await apiGet<Partial<Notification>[]>('/api/notifications');
+            setNotifications(response.map(normalizeNotification));
+            setErrorMessage('');
+        } catch (error) {
+            console.warn('Failed to load notifications:', error);
+            setNotifications(fallbackNotifications);
+            setErrorMessage('Tidak dapat memuat notifikasi real dari API.');
+        } finally {
+            setIsLoading(false);
         }
-        acc[date].push(notif);
+    }, []);
+
+    useEffect(() => {
+        fetchNotifications();
+    }, [fetchNotifications]);
+
+    const groupedNotifications = notifications.reduce((acc, notif) => {
+        if (!acc[notif.date]) {
+            acc[notif.date] = [];
+        }
+
+        acc[notif.date].push(notif);
         return acc;
     }, {} as Record<string, Notification[]>);
 
@@ -110,37 +133,51 @@ const NotificationsPage: React.FC = () => {
 
         Alert.alert(
             'Konfirmasi',
-            'Anda yakin ingin menghapus semua notifikasi?',
+            'Anda yakin ingin menghapus semua notifikasi dari tampilan saat ini?',
             [
                 { text: 'Batal', style: 'cancel' },
                 { text: 'Hapus', style: 'destructive', onPress: () => setNotifications([]) },
-            ]
+            ],
         );
     };
 
     return (
         <View style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-
-                {/* Header Gradient (Gaya sesuai index.tsx & explore.tsx) */}
                 <LinearGradient
                     colors={PRIMARY_GRADIENT}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={styles.header}>
+                    style={styles.header}
+                >
                     <Text style={styles.headerTitle}>Pusat Notifikasi</Text>
-                    {/* Tombol Hapus Semua */}
-                    <Pressable 
-                        onPress={handleClearAll} 
-                        style={({ pressed }) => [styles.clearButton, { opacity: pressed ? 0.7 : 1 }]}
-                    >
-                        <Feather name="trash-2" size={18} color="#fff" />
-                        <Text style={styles.clearButtonText}>Hapus Semua</Text>
-                    </Pressable>
+                    <View style={styles.headerActions}>
+                        <Pressable
+                            onPress={fetchNotifications}
+                            style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.7 : 1 }]}
+                            disabled={isLoading}
+                        >
+                            <Feather name="refresh-cw" size={18} color="#fff" />
+                        </Pressable>
+                        <Pressable
+                            onPress={handleClearAll}
+                            style={({ pressed }) => [styles.clearButton, { opacity: pressed ? 0.7 : 1 }]}
+                        >
+                            <Feather name="trash-2" size={18} color="#fff" />
+                            <Text style={styles.clearButtonText}>Hapus Semua</Text>
+                        </Pressable>
+                    </View>
                 </LinearGradient>
 
                 <View style={styles.contentArea}>
-                    {Object.keys(groupedNotifications).length === 0 ? (
+                    {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+                    {isLoading ? (
+                        <View style={styles.loadingState}>
+                            <ActivityIndicator size="small" color="#3b82f6" />
+                            <Text style={styles.loadingText}>Memuat notifikasi sistem...</Text>
+                        </View>
+                    ) : Object.keys(groupedNotifications).length === 0 ? (
                         <View style={styles.emptyState}>
                             <Feather name="bell-off" size={60} color="#9ca3af" style={{ marginBottom: 15 }} />
                             <Text style={styles.emptyStateText}>Tidak ada notifikasi saat ini.</Text>
@@ -151,31 +188,24 @@ const NotificationsPage: React.FC = () => {
                             <View key={date} style={styles.dateGroup}>
                                 <Text style={styles.dateHeader}>{date}</Text>
                                 {groupedNotifications[date].map(notif => (
-                                    <NotificationCard key={notif.id} notification={notif} />
+                                    <NotificationCard key={`${notif.date}-${notif.id}`} notification={notif} />
                                 ))}
                             </View>
                         ))
                     )}
                 </View>
-
             </ScrollView>
         </View>
     );
 };
 
-// export default NotificationsPage; // PENTING: Jangan export di sini jika ini adalah file tab
-
-// =======================================================
-//                           STYLES
-// =======================================================
+export default NotificationsPage;
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#f9fafb',
     },
-
-    // --- Header Gradient (Sesuai index.tsx & explore.tsx) ---
     header: {
         paddingTop: 20,
         paddingBottom: 20,
@@ -193,6 +223,19 @@ const styles = StyleSheet.create({
         color: '#fff',
         marginBottom: 10,
     },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    iconButton: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        marginRight: 8,
+    },
     clearButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -207,10 +250,27 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginLeft: 8,
     },
-
-    // --- Notifikasi ---
     contentArea: {
         paddingHorizontal: 15,
+    },
+    errorText: {
+        color: '#dc2626',
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 6,
+        marginBottom: 8,
+    },
+    loadingState: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 30,
+    },
+    loadingText: {
+        color: '#4b5563',
+        fontSize: 14,
+        fontWeight: '500',
+        marginLeft: 10,
     },
     dateGroup: {
         marginBottom: 20,
@@ -261,8 +321,6 @@ const styles = StyleSheet.create({
         color: '#9ca3af',
         marginTop: 5,
     },
-    
-    // --- Empty State ---
     emptyState: {
         flex: 1,
         alignItems: 'center',
@@ -281,5 +339,3 @@ const styles = StyleSheet.create({
         marginTop: 5,
     },
 });
-
-export default NotificationsPage;
