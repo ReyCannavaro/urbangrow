@@ -1,69 +1,25 @@
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useEffect, useState } from 'react';
+import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { DataCard } from '@/components/dashboard/DataCard';
 import { SensorHistoryCard } from '@/components/dashboard/SensorHistoryCard';
 import { StatusButton } from '@/components/dashboard/StatusButton';
 import { WaterConditionCard } from '@/components/dashboard/WaterConditionCard';
-import { API_BASE_URL, ActuatorStatus } from '@/constants/api';
-import {
-  fetchDashboardSnapshot,
-  getSimulatedDashboardSnapshot,
-  SensorData,
-} from '@/services/sensorService';
+import { useDashboardData } from '@/hooks/use-dashboard-data';
 
 const HEADER_GRADIENT = ['#3b82f6', '#10b981'] as const;
 
 const HomePage: React.FC = () => {
-  const [sensorData, setSensorData] = useState<SensorData>({
-    temperature: 0,
-    ph: 0,
-    ldr_value: 0,
-    timestamp: new Date().toISOString(),
-  });
-  const [sensorHistory, setSensorHistory] = useState<SensorData[]>([]);
-  const [actuatorStatus, setActuatorStatus] = useState<ActuatorStatus>({
-    pumpStatus: 'OFF',
-    lightStatus: 'OFF',
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [isConnected, setIsConnected] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-
-  const fetchData = useCallback(async () => {
-    try {
-      const { sensor, actuator, history } = await fetchDashboardSnapshot();
-
-      setSensorData(sensor);
-      setSensorHistory(history);
-      setActuatorStatus(actuator);
-      setIsConnected(true);
-      setErrorMessage('');
-    } catch (error) {
-      console.warn('API unavailable, using local simulation:', error);
-      const { sensor, actuator } = getSimulatedDashboardSnapshot();
-
-      setSensorData(sensor);
-      setSensorHistory(prev => [...prev.slice(-11), sensor]);
-      setActuatorStatus(actuator);
-      setIsConnected(false);
-
-      if (isLoading) {
-        setErrorMessage(`Tidak dapat terhubung ke server API di ${API_BASE_URL}. Aplikasi ini menggunakan SIMULASI DATA LOKAL.`);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading]);
-
-  useEffect(() => {
-    fetchData();
-
-    const intervalId = setInterval(fetchData, 3000);
-
-    return () => clearInterval(intervalId);
-  }, [fetchData]);
+  const {
+    sensorData,
+    sensorHistory,
+    actuatorStatus,
+    isLoading,
+    isConnected,
+    errorMessage,
+    clearErrorMessage,
+  } = useDashboardData();
 
   const currentTemp = sensorData.temperature || 0;
   const currentPh = sensorData.ph || 0;
@@ -76,7 +32,7 @@ const HomePage: React.FC = () => {
           <Text style={styles.customAlertTitle}>Koneksi Gagal 🔴</Text>
           <Text style={styles.customAlertMessage}>{errorMessage}</Text>
           <View style={styles.customAlertButtonContainer}>
-            <Text style={styles.customAlertButtonText} onPress={() => setErrorMessage('')}>
+            <Text style={styles.customAlertButtonText} onPress={clearErrorMessage}>
               OK
             </Text>
           </View>
