@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     borderColor: AppTheme.color.glassLine,
     shadowColor: AppTheme.shadow.color,
     shadowOffset: AppTheme.shadow.offset,
-    shadowOpacity: 0.18,
+    shadowOpacity: AppTheme.shadow.opacity,
     shadowRadius: 26,
     elevation: 8,
   },
