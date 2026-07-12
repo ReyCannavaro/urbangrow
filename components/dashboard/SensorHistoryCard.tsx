@@ -1,18 +1,59 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SensorData } from '@/services/sensorService';
 import { formatHistoryTime, getTrend } from '@/utils/sensorHistory';
 
-interface MiniBarChartProps {
+type SensorMetric = 'temperature' | 'ph';
+type HistoryRange = '1h' | '24h' | '7d';
+
+interface RangeOption {
+  id: HistoryRange;
+  label: string;
+  hours: number;
+}
+
+const rangeOptions: RangeOption[] = [
+  { id: '1h', label: '1 Jam', hours: 1 },
+  { id: '24h', label: '24 Jam', hours: 24 },
+  { id: '7d', label: '7 Hari', hours: 24 * 7 },
+];
+
+interface LineSensorChartProps {
   history: SensorData[];
-  metric: 'temperature' | 'ph';
+  metric: SensorMetric;
   color: string;
   minValue: number;
   maxValue: number;
+  safeMin: number;
+  safeMax: number;
+  unit?: string;
 }
 
-const MiniBarChart: React.FC<MiniBarChartProps> = ({ history, metric, color, minValue, maxValue }) => {
-  const chartData = history.slice(-8);
+const CHART_HEIGHT = 118;
+const CHART_PADDING = 10;
+const MAX_CHART_POINTS = 40;
+
+const sampleChartData = (history: SensorData[]) => {
+  if (history.length <= MAX_CHART_POINTS) {
+    return history;
+  }
+
+  const step = (history.length - 1) / (MAX_CHART_POINTS - 1);
+  return Array.from({ length: MAX_CHART_POINTS }, (_, index) => history[Math.round(index * step)]);
+};
+
+const LineSensorChart: React.FC<LineSensorChartProps> = ({
+  history,
+  metric,
+  color,
+  minValue,
+  maxValue,
+  safeMin,
+  safeMax,
+  unit = '',
+}) => {
+  const [chartWidth, setChartWidth] = useState(0);
+  const chartData = useMemo(() => sampleChartData(history), [history]);
   const range = Math.max(maxValue - minValue, 1);
 
   if (chartData.length === 0) {
@@ -23,19 +64,91 @@ const MiniBarChart: React.FC<MiniBarChartProps> = ({ history, metric, color, min
     );
   }
 
-  return (
-    <View style={styles.chartRow}>
-      {chartData.map((item, index) => {
-        const value = item[metric];
-        const normalizedValue = Math.max(0, Math.min(1, (value - minValue) / range));
-        const height = 18 + normalizedValue * 52;
+  const onChartLayout = (event: LayoutChangeEvent) => {
+    setChartWidth(event.nativeEvent.layout.width);
+  };
 
-        return (
-          <View key={`${metric}-${item.timestamp}-${index}`} style={styles.chartBarWrapper}>
-            <View style={[styles.chartBar, { height, backgroundColor: color }]} />
-          </View>
-        );
-      })}
+  const plotWidth = Math.max(chartWidth - CHART_PADDING * 2, 1);
+  const plotHeight = CHART_HEIGHT - CHART_PADDING * 2;
+
+  const getPoint = (item: SensorData, index: number) => {
+    const value = item[metric];
+    const normalizedValue = Math.max(0, Math.min(1, (value - minValue) / range));
+    const x = CHART_PADDING + (chartData.length === 1 ? plotWidth / 2 : (index / (chartData.length - 1)) * plotWidth);
+    const y = CHART_PADDING + (1 - normalizedValue) * plotHeight;
+    return { x, y, value };
+  };
+
+  const points = chartData.map(getPoint);
+  const safeTop = CHART_PADDING + (1 - Math.max(0, Math.min(1, (safeMax - minValue) / range))) * plotHeight;
+  const safeBottom = CHART_PADDING + (1 - Math.max(0, Math.min(1, (safeMin - minValue) / range))) * plotHeight;
+
+  return (
+    <View>
+      <View style={styles.chartValueRow}>
+        <Text style={styles.chartAxisText}>
+          {maxValue}
+          {unit}
+        </Text>
+        <Text style={styles.safeZoneText}>
+          Zona aman {safeMin}-{safeMax}
+          {unit}
+        </Text>
+      </View>
+      <View style={styles.lineChart} onLayout={onChartLayout}>
+        <View
+          style={[
+            styles.safeZoneBand,
+            {
+              top: safeTop,
+              height: Math.max(safeBottom - safeTop, 4),
+            },
+          ]}
+        />
+        {points.slice(0, -1).map((point, index) => {
+          const nextPoint = points[index + 1];
+          const deltaX = nextPoint.x - point.x;
+          const deltaY = nextPoint.y - point.y;
+          const length = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+          const angle = Math.atan2(deltaY, deltaX);
+
+          return (
+            <View
+              key={`${metric}-line-${chartData[index].timestamp}-${index}`}
+              style={[
+                styles.chartLine,
+                {
+                  left: point.x,
+                  top: point.y,
+                  width: length,
+                  backgroundColor: color,
+                  transform: [{ rotateZ: `${angle}rad` }],
+                },
+              ]}
+            />
+          );
+        })}
+        {points.map((point, index) => (
+          <View
+            key={`${metric}-point-${chartData[index].timestamp}-${index}`}
+            style={[
+              styles.chartPoint,
+              {
+                left: point.x - 3,
+                top: point.y - 3,
+                borderColor: color,
+              },
+            ]}
+          />
+        ))}
+      </View>
+      <View style={styles.chartValueRow}>
+        <Text style={styles.chartAxisText}>
+          {minValue}
+          {unit}
+        </Text>
+        <Text style={styles.chartAxisText}>{chartData.length} titik</Text>
+      </View>
     </View>
   );
 };
@@ -44,9 +157,21 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
   history,
   isConnected,
 }) => {
-  const latestRows = history.slice(-5).reverse();
-  const tempTrend = getTrend(history, 'temperature');
-  const phTrend = getTrend(history, 'ph');
+  const [selectedRange, setSelectedRange] = useState<HistoryRange>('24h');
+  const selectedRangeOption = rangeOptions.find(option => option.id === selectedRange) ?? rangeOptions[1];
+
+  const filteredHistory = useMemo(() => {
+    const cutoff = Date.now() - selectedRangeOption.hours * 60 * 60 * 1000;
+    return history.filter(item => {
+      const timestamp = new Date(item.timestamp).getTime();
+      return Number.isFinite(timestamp) && timestamp >= cutoff;
+    });
+  }, [history, selectedRangeOption.hours]);
+
+  const chartHistory = filteredHistory.length ? filteredHistory : history.slice(-12);
+  const latestRows = chartHistory.slice(-5).reverse();
+  const tempTrend = getTrend(chartHistory, 'temperature');
+  const phTrend = getTrend(chartHistory, 'ph');
 
   return (
     <View style={styles.historyCard}>
@@ -69,16 +194,50 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
         </Text>
       </View>
 
+      <View style={styles.rangeSelector}>
+        {rangeOptions.map(option => {
+          const isSelected = option.id === selectedRange;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => setSelectedRange(option.id)}
+              style={[styles.rangeButton, isSelected && styles.rangeButtonActive]}
+            >
+              <Text style={[styles.rangeButtonText, isSelected && styles.rangeButtonTextActive]}>
+                {option.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.trendGrid}>
         <View style={styles.trendBox}>
           <Text style={styles.trendLabel}>Tren Suhu</Text>
           <Text style={[styles.trendValue, { color: tempTrend.color }]}>{tempTrend.label}</Text>
-          <MiniBarChart history={history} metric="temperature" color="#3b82f6" minValue={15} maxValue={35} />
+          <LineSensorChart
+            history={chartHistory}
+            metric="temperature"
+            color="#3b82f6"
+            minValue={10}
+            maxValue={40}
+            safeMin={20}
+            safeMax={28.5}
+            unit="°C"
+          />
         </View>
         <View style={styles.trendBox}>
           <Text style={styles.trendLabel}>Tren pH</Text>
           <Text style={[styles.trendValue, { color: phTrend.color }]}>{phTrend.label}</Text>
-          <MiniBarChart history={history} metric="ph" color="#10b981" minValue={4} maxValue={9} />
+          <LineSensorChart
+            history={chartHistory}
+            metric="ph"
+            color="#10b981"
+            minValue={4}
+            maxValue={10}
+            safeMin={6}
+            safeMax={7.5}
+          />
         </View>
       </View>
 
@@ -141,18 +300,46 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     alignSelf: 'flex-start',
   },
-  trendGrid: {
+  rangeSelector: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 12,
+  },
+  rangeButton: {
+    flex: 1,
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 9,
+  },
+  rangeButtonActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#111827',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  rangeButtonText: {
+    color: '#6b7280',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rangeButtonTextActive: {
+    color: '#1f2937',
+  },
+  trendGrid: {
     marginBottom: 14,
   },
   trendBox: {
-    width: '48.5%',
     borderWidth: 1,
     borderColor: '#f3f4f6',
     borderRadius: 12,
     padding: 10,
     backgroundColor: '#f9fafb',
+    marginBottom: 10,
   },
   trendLabel: {
     fontSize: 12,
@@ -165,26 +352,57 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 8,
   },
-  chartRow: {
-    height: 74,
+  chartValueRow: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     justifyContent: 'space-between',
-  },
-  chartBarWrapper: {
-    flex: 1,
-    height: 74,
-    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginHorizontal: 1,
+    marginBottom: 4,
   },
-  chartBar: {
-    width: 8,
+  chartAxisText: {
+    color: '#9ca3af',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  safeZoneText: {
+    color: '#059669',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  lineChart: {
+    height: CHART_HEIGHT,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  safeZoneBand: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    backgroundColor: '#dcfce7',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#bbf7d0',
+    opacity: 0.72,
+  },
+  chartLine: {
+    position: 'absolute',
+    height: 2.5,
+    borderRadius: 2,
+    opacity: 0.86,
+  },
+  chartPoint: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
     borderRadius: 4,
-    opacity: 0.85,
+    borderWidth: 2,
+    backgroundColor: '#fff',
   },
   emptyChart: {
-    height: 74,
+    height: CHART_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },

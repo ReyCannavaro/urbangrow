@@ -145,7 +145,7 @@ npm run web
 | `POST` | `/api/update-sensor` | Alias input sensor |
 | `POST` | `/receive_data` | Kompatibilitas endpoint IoT lama |
 | `GET` | `/api/latest-reading` | Ambil data sensor terbaru |
-| `GET` | `/api/sensor-history?limit=12` | Ambil riwayat sensor |
+| `GET` | `/api/sensor-history?limit=1000&hours=24` | Ambil riwayat sensor |
 | `GET` | `/api/sensor-log` | Alias riwayat sensor |
 | `GET` | `/api/actuator-status` | Ambil status pompa/lampu |
 | `POST` | `/api/actuator-control` | Buat command kontrol aktuator |
@@ -173,6 +173,20 @@ Contoh kondisi pH rendah:
 curl.exe -X POST http://localhost:5000/api/sensor-readings `
   -H "Content-Type: application/json" `
   -d "{\"temperature\":26.4,\"ph\":5.6,\"ldr_value\":430}"
+```
+
+Validasi data sensor:
+
+- `ph` wajib berada di rentang `0` sampai `14`.
+- `temperature` wajib berada di rentang `0` sampai `60` derajat C.
+- `ldr_value` tidak boleh negatif.
+- `timestamp` boleh dikosongkan agar backend memakai waktu server.
+- Jika `timestamp` dikirim, nilainya harus format ISO 8601 valid.
+
+Contoh riwayat 24 jam terakhir:
+
+```powershell
+curl.exe "http://localhost:5000/api/sensor-history?limit=1000&hours=24"
 ```
 
 Contoh kontrol aktuator:

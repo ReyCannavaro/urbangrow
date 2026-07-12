@@ -40,7 +40,7 @@ export const fetchDashboardSnapshot = async (): Promise<DashboardSnapshot> => {
   const [latestReading, actuatorData, historyData] = await Promise.all([
     apiGet<SensorData>('/api/latest-reading'),
     apiGet<ActuatorStatus>('/api/actuator-status'),
-    apiGet<SensorData[]>('/api/sensor-history?limit=12'),
+    apiGet<SensorData[]>('/api/sensor-history?limit=1000&hours=168'),
   ]);
 
   const sensor = normalizeSensorData(latestReading);

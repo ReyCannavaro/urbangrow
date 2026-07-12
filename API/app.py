@@ -17,6 +17,11 @@ DATABASE_PATH = os.getenv(
 )
 DEFAULT_TEMPERATURE = 25.5
 NOTIFICATION_DEDUPE_MINUTES = 5
+MIN_TEMPERATURE = 0.0
+MAX_TEMPERATURE = 60.0
+MIN_PH = 0.0
+MAX_PH = 14.0
+MIN_LDR_VALUE = 0
 DEFAULT_DEVICE_ID = os.getenv("URBANGROW_DEFAULT_DEVICE_ID", "esp32-main")
 ESP_HTTP_CONTROL_URL = os.getenv("URBANGROW_ESP_HTTP_CONTROL_URL", "").strip()
 MQTT_COMMAND_TOPIC = os.getenv("URBANGROW_MQTT_COMMAND_TOPIC", "urbangrow/actuator/commands")
@@ -167,6 +172,28 @@ def to_int(value: Any, field_name: str, required: bool = True) -> int | None:
         raise ValueError(f"{field_name} harus berupa angka bulat.") from exc
 
 
+def validate_range(value: float | int, field_name: str, min_value: float | int, max_value: float | int | None = None) -> None:
+    if value < min_value:
+        raise ValueError(f"{field_name} tidak boleh kurang dari {min_value}.")
+
+    if max_value is not None and value > max_value:
+        raise ValueError(f"{field_name} tidak boleh lebih dari {max_value}.")
+
+
+def normalize_sensor_timestamp(value: Any) -> str:
+    if value is None or value == "":
+        return utc_now()
+
+    if not isinstance(value, str):
+        raise ValueError("timestamp harus berupa string ISO 8601.")
+
+    parsed_timestamp = parse_timestamp(value)
+    if parsed_timestamp is None:
+        raise ValueError("timestamp harus berupa ISO 8601 yang valid.")
+
+    return parsed_timestamp.isoformat()
+
+
 def get_latest_temperature() -> float:
     with get_db() as db:
         row = db.execute(
@@ -193,13 +220,17 @@ def normalize_sensor_payload(data: dict[str, Any]) -> dict[str, Any]:
     if temperature is None:
         temperature = get_latest_temperature()
 
+    validate_range(ph, "ph", MIN_PH, MAX_PH)
+    validate_range(temperature, "temperature", MIN_TEMPERATURE, MAX_TEMPERATURE)
+    validate_range(ldr_value, "ldr_value", MIN_LDR_VALUE)
+
     return {
         "temperature": round(temperature, 2),
         "ph": round(ph, 2),
         "ldr_value": ldr_value,
         "ph_status": data.get("ph_status"),
         "light_status": data.get("light_status"),
-        "timestamp": data.get("timestamp") or utc_now(),
+        "timestamp": normalize_sensor_timestamp(data.get("timestamp")),
     }
 
 
@@ -266,17 +297,30 @@ def get_latest_reading() -> dict[str, Any]:
     return {**dict(row), "source": "database"}
 
 
-def get_sensor_history(limit: int = 20) -> list[dict[str, Any]]:
-    limit = max(1, min(limit, 100))
+def get_sensor_history(limit: int = 20, hours: int | None = None) -> list[dict[str, Any]]:
+    limit = max(1, min(limit, 1000))
+    params: list[Any] = []
+    where_clause = ""
+
+    if hours is not None:
+        hours = max(1, min(hours, 24 * 7))
+        cutoff_timestamp = datetime.now(timezone.utc).timestamp() - hours * 3600
+        cutoff = datetime.fromtimestamp(cutoff_timestamp, timezone.utc).isoformat()
+        where_clause = "WHERE timestamp >= ?"
+        params.append(cutoff)
+
+    params.append(limit)
+
     with get_db() as db:
         rows = db.execute(
-            """
+            f"""
             SELECT id, temperature, ph, ldr_value, ph_status, light_status, timestamp
             FROM sensor_readings
+            {where_clause}
             ORDER BY timestamp DESC, id DESC
             LIMIT ?
             """,
-            (limit,),
+            params,
         ).fetchall()
 
     return [dict(row) for row in rows]
@@ -1057,7 +1101,11 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
                 limit = int(query.get("limit", ["20"])[0])
             except ValueError:
                 limit = 20
-            self.send_json(200, get_sensor_history(limit))
+            try:
+                hours = int(query["hours"][0]) if "hours" in query else None
+            except ValueError:
+                hours = None
+            self.send_json(200, get_sensor_history(limit, hours))
             return
 
         if path == "/api/actuator-status":
