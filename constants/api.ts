@@ -78,6 +78,45 @@ export interface ActuatorControlResponse {
   actuator: ActuatorStatus;
 }
 
+export type DeviceSyncState = 'idle' | 'stale' | 'pending' | 'syncing' | 'success' | 'failed' | 'skipped';
+
+export interface DeviceSyncLog {
+  id: number;
+  device_id: string;
+  status: DeviceSyncState;
+  trigger: string;
+  reason: string;
+  attempts: number;
+  message?: string | null;
+  requested_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  payload?: {
+    sync_id: number;
+    device_id: string;
+    action: 'reconnect_sensor' | string;
+    mqtt_topic: string;
+    reason: string;
+    requested_at: string;
+  };
+}
+
+export interface DeviceSyncStatus {
+  device_id: string;
+  status: DeviceSyncState;
+  is_stale: boolean;
+  minutes_since_update: number | null;
+  latest_sensor_timestamp: string | null;
+  reason: string;
+  latest_sync?: DeviceSyncLog | null;
+}
+
+export interface DeviceSyncResponse {
+  message: string;
+  sync: DeviceSyncLog;
+  sync_status: DeviceSyncStatus;
+}
+
 export const apiGet = async <T,>(path: string): Promise<T> => {
   const response = await fetch(`${API_BASE_URL}${path}`);
 

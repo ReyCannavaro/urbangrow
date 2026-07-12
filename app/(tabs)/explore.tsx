@@ -19,6 +19,8 @@ import {
     ActuatorStatus,
     apiGet,
     apiPost,
+    DeviceSyncResponse,
+    DeviceSyncStatus,
     normalizeActuatorStatus,
 } from '@/constants/api';
 
@@ -153,21 +155,36 @@ interface ActionCardProps {
     icon: keyof typeof Feather.glyphMap;
     actionColor: string;
     onPerformAction: () => void;
+    isDisabled?: boolean;
+    isLoading?: boolean;
 }
 
-const ActionPressable: React.FC<ActionCardProps> = ({ title, subtitle, icon, actionColor, onPerformAction }) => {
+const ActionPressable: React.FC<ActionCardProps> = ({
+    title,
+    subtitle,
+    icon,
+    actionColor,
+    onPerformAction,
+    isDisabled = false,
+    isLoading = false,
+}) => {
     return (
         <Pressable
             style={({ pressed }) => [
                 styles.actionCard,
                 { backgroundColor: actionColor, 
-                  opacity: pressed ? 0.7 : 1,
+                  opacity: isDisabled ? 0.58 : pressed ? 0.7 : 1,
                   transform: [{ scale: pressed ? 0.95 : 1 }],
                 }
             ]}
             onPress={onPerformAction}
+            disabled={isDisabled}
         >
-            <Feather name={icon} size={30} color="#fff" />
+            {isLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+            ) : (
+                <Feather name={icon} size={30} color="#fff" />
+            )}
             <Text style={styles.actionTitle}>{title}</Text>
             <Text style={styles.actionSubtitle}>{subtitle}</Text>
         </Pressable>
@@ -198,6 +215,9 @@ const ExplorePage: React.FC = () => {
     const [activeControl, setActiveControl] = useState<ActuatorKey | null>(null);
     const [latestActuatorCommand, setLatestActuatorCommand] = useState<ActuatorCommand | null>(null);
     const [commandStatusMessage, setCommandStatusMessage] = useState('');
+    const [syncStatus, setSyncStatus] = useState<DeviceSyncStatus | null>(null);
+    const [isSyncingDevice, setIsSyncingDevice] = useState(false);
+    const [syncMessage, setSyncMessage] = useState('');
     const [controlError, setControlError] = useState('');
     const [manualSensorForm, setManualSensorForm] = useState<ManualSensorForm>({
         temperature: '26.8',
@@ -230,10 +250,20 @@ const ExplorePage: React.FC = () => {
         }
     }, []);
 
+    const fetchSyncStatus = useCallback(async () => {
+        try {
+            const status = await apiGet<DeviceSyncStatus>('/api/sync-status');
+            setSyncStatus(status);
+        } catch (error) {
+            console.warn('Failed to load sync status:', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchActuatorStatus();
         fetchLatestActuatorCommand();
-    }, [fetchActuatorStatus, fetchLatestActuatorCommand]);
+        fetchSyncStatus();
+    }, [fetchActuatorStatus, fetchLatestActuatorCommand, fetchSyncStatus]);
 
     const handleActuatorToggle = async (item: ControlItem, nextValue: 'ON' | 'OFF') => {
         setActiveControl(item.actuatorKey);
@@ -268,6 +298,35 @@ const ExplorePage: React.FC = () => {
 
     const handleFeedAction = () => {
         Alert.alert('Aksi Pakan', 'Pakan ikan telah dikeluarkan sekarang.');
+    };
+
+    const handleDeviceSync = async () => {
+        setIsSyncingDevice(true);
+        setSyncMessage('');
+
+        try {
+            const response = await apiPost<DeviceSyncResponse>('/api/sync-device', {
+                trigger: 'manual',
+                reason: 'User meminta perangkat menyambungkan ulang sensor dari aplikasi.',
+                force: true,
+            });
+            setSyncStatus(response.sync_status);
+            setSyncMessage(response.sync.message || 'Sync perangkat berhasil dikirim.');
+
+            if (response.sync.status === 'pending' || response.sync.status === 'syncing') {
+                Alert.alert('Sync Alat', 'Permintaan sync masuk antrean dan menunggu respons ESP.');
+            } else if (response.sync.status === 'failed') {
+                Alert.alert('Sync Gagal', response.sync.message || 'Perangkat belum merespons sync.');
+            } else {
+                Alert.alert('Sync Alat', response.sync.message || 'Perangkat berhasil menjalankan sync.');
+            }
+        } catch (error) {
+            console.warn('Failed to request device sync:', error);
+            setSyncMessage('Gagal meminta sync perangkat. Pastikan API sedang berjalan.');
+            Alert.alert('Sync Gagal', 'Permintaan sync belum terkirim ke API.');
+        } finally {
+            setIsSyncingDevice(false);
+        }
     };
 
     const setSensorField = (field: keyof ManualSensorForm, value: string) => {
@@ -477,7 +536,50 @@ const ExplorePage: React.FC = () => {
                             actionColor={COLOR_ORANGE}
                             onPerformAction={handleFeedAction}
                         />
+                        <ActionPressable
+                            title="Sync Alat"
+                            subtitle={isSyncingDevice ? 'Mengirim' : 'Reconnect'}
+                            icon="refresh-cw"
+                            actionColor={COLOR_BLUE}
+                            onPerformAction={handleDeviceSync}
+                            isDisabled={isSyncingDevice}
+                            isLoading={isSyncingDevice}
+                        />
                     </View>
+                    {syncStatus ? (
+                        <View
+                            style={[
+                                styles.syncStatusCard,
+                                { borderColor: getCommandStatusColor(syncStatus.status === 'stale' ? 'failed' : syncStatus.status === 'success' ? 'success' : 'pending') },
+                            ]}
+                        >
+                            <View style={styles.commandStatusHeader}>
+                                <Text style={styles.commandStatusMeta}>Sync System</Text>
+                                <Text
+                                    style={[
+                                        styles.commandStatusBadge,
+                                        {
+                                            color: getCommandStatusColor(
+                                                syncStatus.status === 'stale'
+                                                    ? 'failed'
+                                                    : syncStatus.status === 'success'
+                                                        ? 'success'
+                                                        : 'pending',
+                                            ),
+                                        },
+                                    ]}
+                                >
+                                    {syncStatus.status.toUpperCase()}
+                                </Text>
+                            </View>
+                            <Text style={styles.commandStatusText}>
+                                {syncMessage || syncStatus.reason}
+                            </Text>
+                            <Text style={styles.commandStatusHint}>
+                                Update sensor: {syncStatus.minutes_since_update ?? '-'} menit lalu
+                            </Text>
+                        </View>
+                    ) : null}
                 </View>
 
                 <View style={styles.section}>
@@ -611,6 +713,15 @@ const styles = StyleSheet.create({
         padding: 12,
         marginHorizontal: 5,
         marginBottom: 12,
+    },
+    syncStatusCard: {
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderRadius: 16,
+        padding: 12,
+        marginHorizontal: 5,
+        marginTop: 2,
+        marginBottom: 8,
     },
     commandStatusHeader: {
         flexDirection: 'row',

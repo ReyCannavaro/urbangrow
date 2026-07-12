@@ -116,6 +116,31 @@ class BackendTestCase(unittest.TestCase):
                 {"temperature": 27, "ph": 6.8, "ldr_value": 1, "timestamp": "not-a-date"}
             )
 
+    def test_device_sync_queue_and_ack_success(self) -> None:
+        sync_log = api.create_device_sync_request(
+            {
+                "trigger": "manual",
+                "reason": "Data sensor tidak update.",
+                "force": True,
+            }
+        )
+        claimed_sync = api.claim_next_device_sync("esp32-main")
+
+        self.assertEqual(sync_log["status"], "pending")
+        self.assertIsNotNone(claimed_sync)
+        self.assertEqual(claimed_sync["status"], "syncing")
+        self.assertEqual(claimed_sync["payload"]["action"], "reconnect_sensor")
+
+        completed_sync = api.update_device_sync_status(
+            claimed_sync["id"],
+            "success",
+            "Sensor reconnect berhasil.",
+        )
+        sync_status = api.get_sync_status("esp32-main")
+
+        self.assertEqual(completed_sync["status"], "success")
+        self.assertEqual(sync_status["latest_sync"]["status"], "success")
+
 
 if __name__ == "__main__":
     unittest.main()

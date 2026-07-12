@@ -48,8 +48,12 @@ set URBANGROW_RATE_LIMIT_WINDOW_SECONDS=60
 set URBANGROW_RATE_LIMIT_MAX_REQUESTS=120
 set URBANGROW_MAX_JSON_BODY_BYTES=8192
 set URBANGROW_ESP_HTTP_CONTROL_URL=http://192.168.1.50/actuator
+set URBANGROW_ESP_HTTP_SYNC_URL=http://192.168.1.50/sync
 set URBANGROW_DEFAULT_DEVICE_ID=esp32-main
 set URBANGROW_MQTT_COMMAND_TOPIC=urbangrow/actuator/commands
+set URBANGROW_MQTT_SYNC_TOPIC=urbangrow/device/sync
+set URBANGROW_SYNC_STALE_MINUTES=5
+set URBANGROW_SYNC_COOLDOWN_SECONDS=120
 ```
 
 Do not prefix backend secrets with `EXPO_PUBLIC_`.
@@ -74,3 +78,14 @@ The backend supports two actuator delivery modes:
 - HTTP polling: leave the URL empty; ESP polls `/api/actuator-commands/next?device_id=esp32-main`, executes the command, then POSTs `/api/actuator-commands/ack`.
 
 Command status values are `pending`, `success`, and `failed`. The app only treats the physical actuator state as changed after a command succeeds.
+
+## Device Sync Integration
+
+The backend can request a device reconnect/sync when sensor data is stale:
+
+- App/manual request: `POST /api/sync-device`
+- ESP polling: `GET /api/sync-device/next?device_id=esp32-main`
+- ESP ack: `POST /api/sync-device/ack`
+- App status: `GET /api/sync-status`
+
+If `URBANGROW_ESP_HTTP_SYNC_URL` is set, backend sends the sync payload directly to the ESP. Otherwise the ESP should poll the queue. MQTT bridges can use the payload topic from `URBANGROW_MQTT_SYNC_TOPIC`.
