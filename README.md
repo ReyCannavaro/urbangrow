@@ -97,6 +97,27 @@ set URBANGROW_API_PORT=5000
 set URBANGROW_DATABASE_PATH=API\urban_grow.db
 ```
 
+Security ringan opsional:
+
+```bash
+set URBANGROW_API_TOKEN=change-this-local-token
+set URBANGROW_RATE_LIMIT_WINDOW_SECONDS=60
+set URBANGROW_RATE_LIMIT_MAX_REQUESTS=120
+set URBANGROW_MAX_JSON_BODY_BYTES=8192
+```
+
+Jika `URBANGROW_API_TOKEN` diisi, endpoint POST sensitif seperti sensor, kontrol aktuator, ack command, dan clear notifikasi wajib mengirim header:
+
+```text
+X-API-Token: change-this-local-token
+```
+
+Untuk aplikasi Expo lokal/demo, samakan token frontend:
+
+```bash
+EXPO_PUBLIC_API_TOKEN=change-this-local-token
+```
+
 ## Setup Gemini Untuk AgriBot
 
 API key Gemini tidak disimpan di frontend. Set key di backend:
@@ -164,6 +185,15 @@ PowerShell:
 ```powershell
 curl.exe -X POST http://localhost:5000/api/sensor-readings `
   -H "Content-Type: application/json" `
+  -d "{\"temperature\":27.4,\"ph\":6.7,\"ldr_value\":420}"
+```
+
+Jika API token aktif:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/sensor-readings `
+  -H "Content-Type: application/json" `
+  -H "X-API-Token: change-this-local-token" `
   -d "{\"temperature\":27.4,\"ph\":6.7,\"ldr_value\":420}"
 ```
 
@@ -260,6 +290,12 @@ Backend syntax check:
 
 ```bash
 python -m py_compile API\app.py
+```
+
+Backend test:
+
+```bash
+python -m unittest discover -s tests
 ```
 
 ## Troubleshooting

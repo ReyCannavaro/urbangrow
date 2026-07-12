@@ -25,6 +25,10 @@ MIN_LDR_VALUE = 0
 DEFAULT_DEVICE_ID = os.getenv("URBANGROW_DEFAULT_DEVICE_ID", "esp32-main")
 ESP_HTTP_CONTROL_URL = os.getenv("URBANGROW_ESP_HTTP_CONTROL_URL", "").strip()
 MQTT_COMMAND_TOPIC = os.getenv("URBANGROW_MQTT_COMMAND_TOPIC", "urbangrow/actuator/commands")
+API_TOKEN = os.getenv("URBANGROW_API_TOKEN", "").strip()
+MAX_JSON_BODY_BYTES = int(os.getenv("URBANGROW_MAX_JSON_BODY_BYTES", "8192"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("URBANGROW_RATE_LIMIT_WINDOW_SECONDS", "60"))
+RATE_LIMIT_MAX_REQUESTS = int(os.getenv("URBANGROW_RATE_LIMIT_MAX_REQUESTS", "120"))
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 AGRIBOT_SYSTEM_PROMPT = (
@@ -38,6 +42,16 @@ AGRIBOT_SYSTEM_PROMPT = (
     "setiap poin penting atau judul sub-bagian menggunakan format **bold** agar "
     "mudah dibaca. Untuk daftar, gunakan format * atau - di awal baris."
 )
+RATE_LIMIT_BUCKETS: dict[tuple[str, str], list[float]] = {}
+TOKEN_PROTECTED_POST_PATHS = {
+    "/api/sensor-readings",
+    "/api/update-sensor",
+    "/receive_data",
+    "/api/actuator-control",
+    "/api/actuator-commands/ack",
+    "/api/actuator-command-ack",
+    "/api/notifications/clear",
+}
 
 
 def utc_now() -> str:
@@ -60,8 +74,15 @@ def parse_timestamp(value: str | None) -> datetime | None:
     return parsed_value.astimezone(timezone.utc)
 
 
+class ClosingConnection(sqlite3.Connection):
+    def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool:
+        should_suppress = super().__exit__(exc_type, exc_value, traceback)
+        self.close()
+        return bool(should_suppress)
+
+
 def get_db() -> sqlite3.Connection:
-    connection = sqlite3.connect(DATABASE_PATH)
+    connection = sqlite3.connect(DATABASE_PATH, factory=ClosingConnection)
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -178,6 +199,54 @@ def validate_range(value: float | int, field_name: str, min_value: float | int, 
 
     if max_value is not None and value > max_value:
         raise ValueError(f"{field_name} tidak boleh lebih dari {max_value}.")
+
+
+def validate_no_unknown_fields(data: dict[str, Any], allowed_fields: set[str]) -> None:
+    unknown_fields = sorted(set(data) - allowed_fields)
+    if unknown_fields:
+        raise ValueError(f"Field tidak dikenal: {', '.join(unknown_fields)}.")
+
+
+def validate_required_fields(data: dict[str, Any], required_fields: set[str]) -> None:
+    missing_fields = sorted(field for field in required_fields if data.get(field) is None)
+    if missing_fields:
+        raise ValueError(f"Field wajib belum diisi: {', '.join(missing_fields)}.")
+
+
+def validate_sensor_request_fields(data: dict[str, Any]) -> None:
+    validate_no_unknown_fields(
+        data,
+        {
+            "temperature",
+            "ph",
+            "ldr",
+            "ldr_value",
+            "ph_status",
+            "light_status",
+            "timestamp",
+        },
+    )
+    validate_required_fields(data, {"ph"})
+
+    if data.get("ldr") is None and data.get("ldr_value") is None:
+        raise ValueError("Field wajib belum diisi: ldr_value.")
+
+
+def validate_actuator_request_fields(data: dict[str, Any]) -> None:
+    validate_no_unknown_fields(data, {"key", "value", "device_id", "requested_by"})
+    validate_required_fields(data, {"key", "value"})
+
+
+def validate_actuator_ack_fields(data: dict[str, Any]) -> None:
+    validate_no_unknown_fields(data, {"command_id", "id", "status", "message"})
+    if data.get("command_id") is None and data.get("id") is None:
+        raise ValueError("Field wajib belum diisi: command_id.")
+    validate_required_fields(data, {"status"})
+
+
+def validate_chat_request_fields(data: dict[str, Any]) -> None:
+    validate_no_unknown_fields(data, {"message"})
+    validate_required_fields(data, {"message"})
 
 
 def normalize_sensor_timestamp(value: Any) -> str:
@@ -1007,6 +1076,24 @@ def get_notifications(limit: int = 50) -> list[dict[str, Any]]:
     return build_live_notifications()
 
 
+def is_rate_limited(client_id: str, path: str) -> bool:
+    if RATE_LIMIT_MAX_REQUESTS <= 0 or RATE_LIMIT_WINDOW_SECONDS <= 0:
+        return False
+
+    now = datetime.now(timezone.utc).timestamp()
+    cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+    bucket_key = (client_id, path)
+    request_times = [timestamp for timestamp in RATE_LIMIT_BUCKETS.get(bucket_key, []) if timestamp >= cutoff]
+
+    if len(request_times) >= RATE_LIMIT_MAX_REQUESTS:
+        RATE_LIMIT_BUCKETS[bucket_key] = request_times
+        return True
+
+    request_times.append(now)
+    RATE_LIMIT_BUCKETS[bucket_key] = request_times
+    return False
+
+
 def get_gemini_api_key() -> str | None:
     return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
 
@@ -1071,7 +1158,7 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         self.wfile.write(body)
@@ -1079,7 +1166,7 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-API-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
 
@@ -1087,6 +1174,9 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
         query = parse_qs(parsed_url.query)
+
+        if self.is_current_request_rate_limited(path):
+            return
 
         if path in {"/", "/api/health"}:
             self.send_json(200, {"status": "ok", "service": "urbangrow-api", "timestamp": utc_now()})
@@ -1149,6 +1239,13 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         path = parsed_url.path
 
+        if self.is_current_request_rate_limited(path):
+            return
+
+        if self.requires_api_token(path) and not self.has_valid_api_token():
+            self.send_json(401, {"error": "API token tidak valid atau belum dikirim."})
+            return
+
         try:
             payload = self.read_json_body()
         except ValueError as exc:
@@ -1157,6 +1254,7 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
 
         if path in {"/api/sensor-readings", "/api/update-sensor", "/receive_data"}:
             try:
+                validate_sensor_request_fields(payload)
                 reading = normalize_sensor_payload(payload)
                 saved_reading = insert_sensor_reading(reading)
             except ValueError as exc:
@@ -1169,6 +1267,7 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
 
         if path == "/api/actuator-control":
             try:
+                validate_actuator_request_fields(payload)
                 command = create_actuator_command(payload)
             except ValueError as exc:
                 self.send_json(400, {"error": str(exc)})
@@ -1189,6 +1288,7 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
 
         if path in {"/api/actuator-commands/ack", "/api/actuator-command-ack"}:
             try:
+                validate_actuator_ack_fields(payload)
                 command_id = int(payload.get("command_id", payload.get("id")))
                 status = str(payload.get("status", "")).lower()
                 message = str(payload.get("message", "")).strip()
@@ -1208,6 +1308,12 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/notifications/clear":
+            try:
+                validate_no_unknown_fields(payload, set())
+            except ValueError as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+
             cleared_count = clear_notifications()
             self.send_json(
                 200,
@@ -1219,6 +1325,12 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/chat":
+            try:
+                validate_chat_request_fields(payload)
+            except ValueError as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+
             message = str(payload.get("message", "")).strip()
             if not message:
                 self.send_json(400, {"error": "message wajib diisi."})
@@ -1230,9 +1342,16 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
         self.send_json(404, {"error": "Endpoint tidak ditemukan."})
 
     def read_json_body(self) -> dict[str, Any]:
+        content_type = self.headers.get("Content-Type", "")
+        if "application/json" not in content_type.lower():
+            raise ValueError("Content-Type harus application/json.")
+
         content_length = int(self.headers.get("Content-Length", "0"))
         if content_length <= 0:
             raise ValueError("Body JSON wajib diisi.")
+
+        if content_length > MAX_JSON_BODY_BYTES:
+            raise ValueError(f"Body JSON maksimal {MAX_JSON_BODY_BYTES} bytes.")
 
         raw_body = self.rfile.read(content_length).decode("utf-8")
         try:
@@ -1244,6 +1363,20 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             raise ValueError("Body JSON harus berupa object.")
 
         return payload
+
+    def is_current_request_rate_limited(self, path: str) -> bool:
+        client_id = self.client_address[0] if self.client_address else "unknown"
+        if is_rate_limited(client_id, path):
+            self.send_json(429, {"error": "Terlalu banyak request. Coba lagi nanti."})
+            return True
+
+        return False
+
+    def requires_api_token(self, path: str) -> bool:
+        return bool(API_TOKEN) and path in TOKEN_PROTECTED_POST_PATHS
+
+    def has_valid_api_token(self) -> bool:
+        return self.headers.get("X-API-Token", "") == API_TOKEN
 
     def log_message(self, format: str, *args: Any) -> None:
         print(f"[HTTP] {self.address_string()} - {format % args}")

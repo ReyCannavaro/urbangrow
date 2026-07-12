@@ -43,12 +43,28 @@ Optional backend variables:
 set URBANGROW_API_HOST=0.0.0.0
 set URBANGROW_API_PORT=5000
 set GEMINI_API_KEY=your_gemini_api_key_here
+set URBANGROW_API_TOKEN=change-this-local-token
+set URBANGROW_RATE_LIMIT_WINDOW_SECONDS=60
+set URBANGROW_RATE_LIMIT_MAX_REQUESTS=120
+set URBANGROW_MAX_JSON_BODY_BYTES=8192
 set URBANGROW_ESP_HTTP_CONTROL_URL=http://192.168.1.50/actuator
 set URBANGROW_DEFAULT_DEVICE_ID=esp32-main
 set URBANGROW_MQTT_COMMAND_TOPIC=urbangrow/actuator/commands
 ```
 
 Do not prefix backend secrets with `EXPO_PUBLIC_`.
+
+If `URBANGROW_API_TOKEN` is set, protected POST endpoints require:
+
+```text
+X-API-Token: change-this-local-token
+```
+
+For local Expo testing only, mirror it to:
+
+```bash
+EXPO_PUBLIC_API_TOKEN=change-this-local-token
+```
 
 ## ESP Actuator Integration
 

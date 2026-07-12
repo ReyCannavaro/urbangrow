@@ -37,6 +37,7 @@ export const API_PROFILE = getConfiguredApiProfile();
 export const API_BASE_URL = normalizeBaseUrl(
   process.env.EXPO_PUBLIC_API_BASE_URL || API_BASE_URL_PROFILES[API_PROFILE],
 );
+export const API_TOKEN = process.env.EXPO_PUBLIC_API_TOKEN || '';
 
 export type ActuatorKey = 'pumpStatus' | 'lightStatus';
 export type ActuatorValue = 'ON' | 'OFF';
@@ -88,9 +89,15 @@ export const apiGet = async <T,>(path: string): Promise<T> => {
 };
 
 export const apiPost = async <T,>(path: string, body: unknown): Promise<T> => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  if (API_TOKEN) {
+    headers['X-API-Token'] = API_TOKEN;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 
