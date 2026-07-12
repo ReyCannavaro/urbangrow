@@ -8,6 +8,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,10 +39,32 @@ interface RecommendationItem {
     color: string;
 }
 
+interface ManualSensorForm {
+    temperature: string;
+    ph: string;
+    ldrValue: string;
+}
+
+interface SensorPreset {
+    id: string;
+    label: string;
+    temperature: number;
+    ph: number;
+    ldrValue: number;
+    color: string;
+}
+
 const recommendationData: RecommendationItem[] = [
     { id: 1, text: 'Kondisi optimal untuk pertumbuhan sayur', icon: 'check-circle', color: '#10b981' },
     { id: 2, text: 'Pertimbangkan panen kangkung minggu ini', icon: 'alert-triangle', color: '#facc15' },
     { id: 3, text: 'Berapa Ph air dengan kualitas terbaik', icon: 'droplet', color: '#3b82f6' },
+];
+
+const sensorPresets: SensorPreset[] = [
+    { id: 'normal', label: 'Normal', temperature: 26.8, ph: 6.8, ldrValue: 460, color: '#10b981' },
+    { id: 'ph-low', label: 'pH Rendah', temperature: 26.4, ph: 5.6, ldrValue: 430, color: '#ef4444' },
+    { id: 'hot', label: 'Suhu Tinggi', temperature: 31.2, ph: 7.1, ldrValue: 410, color: '#f97316' },
+    { id: 'low-light', label: 'Cahaya Rendah', temperature: 25.9, ph: 6.9, ldrValue: 180, color: '#facc15' },
 ];
 
 interface MainControlCardProps extends ControlItem {
@@ -136,6 +159,14 @@ const ExplorePage: React.FC = () => {
     const [isActuatorLoading, setIsActuatorLoading] = useState(true);
     const [activeControl, setActiveControl] = useState<ActuatorKey | null>(null);
     const [controlError, setControlError] = useState('');
+    const [manualSensorForm, setManualSensorForm] = useState<ManualSensorForm>({
+        temperature: '26.8',
+        ph: '6.8',
+        ldrValue: '460',
+    });
+    const [isSensorSubmitting, setIsSensorSubmitting] = useState(false);
+    const [sensorSubmitMessage, setSensorSubmitMessage] = useState('');
+    const [sensorSubmitError, setSensorSubmitError] = useState('');
 
     const fetchActuatorStatus = useCallback(async () => {
         try {
@@ -179,6 +210,64 @@ const ExplorePage: React.FC = () => {
         Alert.alert('Aksi Pakan', 'Pakan ikan telah dikeluarkan sekarang.');
     };
 
+    const setSensorField = (field: keyof ManualSensorForm, value: string) => {
+        setManualSensorForm(prev => ({ ...prev, [field]: value }));
+        setSensorSubmitMessage('');
+        setSensorSubmitError('');
+    };
+
+    const applySensorPreset = (preset: SensorPreset) => {
+        setManualSensorForm({
+            temperature: preset.temperature.toString(),
+            ph: preset.ph.toString(),
+            ldrValue: preset.ldrValue.toString(),
+        });
+        setSensorSubmitMessage('');
+        setSensorSubmitError('');
+    };
+
+    const parseNumberField = (value: string) => Number(value.replace(',', '.'));
+
+    const handleManualSensorSubmit = async () => {
+        const temperature = parseNumberField(manualSensorForm.temperature);
+        const ph = parseNumberField(manualSensorForm.ph);
+        const ldrValue = parseNumberField(manualSensorForm.ldrValue);
+
+        if (!Number.isFinite(temperature) || !Number.isFinite(ph) || !Number.isFinite(ldrValue)) {
+            setSensorSubmitError('Semua nilai sensor harus berupa angka.');
+            return;
+        }
+
+        if (ph < 0 || ph > 14) {
+            setSensorSubmitError('pH harus berada di rentang 0 sampai 14.');
+            return;
+        }
+
+        if (ldrValue < 0) {
+            setSensorSubmitError('Nilai LDR tidak boleh negatif.');
+            return;
+        }
+
+        setIsSensorSubmitting(true);
+        setSensorSubmitError('');
+        setSensorSubmitMessage('');
+
+        try {
+            await apiPost('/api/sensor-readings', {
+                temperature,
+                ph,
+                ldr_value: Math.round(ldrValue),
+            });
+            await fetchActuatorStatus();
+            setSensorSubmitMessage('Data sensor berhasil dikirim ke API.');
+        } catch (error) {
+            console.warn('Failed to submit manual sensor data:', error);
+            setSensorSubmitError('Gagal mengirim data sensor. Pastikan backend UrbanGrow sedang berjalan.');
+        } finally {
+            setIsSensorSubmitting(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
@@ -211,6 +300,83 @@ const ExplorePage: React.FC = () => {
                             <Text style={styles.loadingText}>Memuat status perangkat...</Text>
                         </View>
                     ) : null}
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Input Sensor Manual</Text>
+                    <View style={styles.manualSensorCard}>
+                        <View style={styles.manualInputRow}>
+                            <View style={styles.manualInputGroup}>
+                                <Text style={styles.manualInputLabel}>Suhu</Text>
+                                <TextInput
+                                    style={styles.manualInput}
+                                    value={manualSensorForm.temperature}
+                                    onChangeText={value => setSensorField('temperature', value)}
+                                    keyboardType="decimal-pad"
+                                    placeholder="26.8"
+                                    placeholderTextColor="#9ca3af"
+                                />
+                            </View>
+                            <View style={styles.manualInputGroup}>
+                                <Text style={styles.manualInputLabel}>pH</Text>
+                                <TextInput
+                                    style={styles.manualInput}
+                                    value={manualSensorForm.ph}
+                                    onChangeText={value => setSensorField('ph', value)}
+                                    keyboardType="decimal-pad"
+                                    placeholder="6.8"
+                                    placeholderTextColor="#9ca3af"
+                                />
+                            </View>
+                            <View style={styles.manualInputGroup}>
+                                <Text style={styles.manualInputLabel}>LDR</Text>
+                                <TextInput
+                                    style={styles.manualInput}
+                                    value={manualSensorForm.ldrValue}
+                                    onChangeText={value => setSensorField('ldrValue', value)}
+                                    keyboardType="number-pad"
+                                    placeholder="460"
+                                    placeholderTextColor="#9ca3af"
+                                />
+                            </View>
+                        </View>
+
+                        <View style={styles.presetGrid}>
+                            {sensorPresets.map(preset => (
+                                <Pressable
+                                    key={preset.id}
+                                    style={({ pressed }) => [
+                                        styles.presetButton,
+                                        { borderColor: preset.color, opacity: pressed ? 0.72 : 1 },
+                                    ]}
+                                    onPress={() => applySensorPreset(preset)}
+                                >
+                                    <Text style={[styles.presetButtonText, { color: preset.color }]}>{preset.label}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+
+                        {sensorSubmitError ? <Text style={styles.errorText}>{sensorSubmitError}</Text> : null}
+                        {sensorSubmitMessage ? <Text style={styles.successText}>{sensorSubmitMessage}</Text> : null}
+
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.submitSensorButton,
+                                { opacity: isSensorSubmitting ? 0.6 : pressed ? 0.82 : 1 },
+                            ]}
+                            onPress={handleManualSensorSubmit}
+                            disabled={isSensorSubmitting}
+                        >
+                            {isSensorSubmitting ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Feather name="upload-cloud" size={20} color="#fff" />
+                            )}
+                            <Text style={styles.submitSensorButtonText}>
+                                {isSensorSubmitting ? 'Mengirim...' : 'Kirim Data Sensor'}
+                            </Text>
+                        </Pressable>
+                    </View>
                 </View>
 
                 <View style={styles.section}>
@@ -320,6 +486,12 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         marginBottom: 10,
     },
+    successText: {
+        color: '#059669',
+        fontSize: 13,
+        lineHeight: 18,
+        marginBottom: 10,
+    },
     loadingRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -361,6 +533,73 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 14,
+    },
+
+    manualSensorCard: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 16,
+        padding: 14,
+    },
+    manualInputRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    manualInputGroup: {
+        width: '31.5%',
+    },
+    manualInputLabel: {
+        color: '#4b5563',
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 6,
+    },
+    manualInput: {
+        minHeight: 44,
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+        borderRadius: 12,
+        paddingHorizontal: 10,
+        backgroundColor: '#f9fafb',
+        color: '#1f2937',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    presetGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: 10,
+    },
+    presetButton: {
+        width: '48.5%',
+        borderWidth: 1.5,
+        borderRadius: 12,
+        paddingVertical: 9,
+        paddingHorizontal: 10,
+        marginBottom: 8,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+    },
+    presetButtonText: {
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    submitSensorButton: {
+        minHeight: 46,
+        borderRadius: 14,
+        backgroundColor: '#3b82f6',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    submitSensorButtonText: {
+        color: '#fff',
+        fontSize: 15,
+        fontWeight: '700',
+        marginLeft: 8,
     },
 
     actionGrid: {
