@@ -12,6 +12,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '@/constants/api';
 import { AppTheme } from '@/constants/theme';
+import { GlassBackground } from '@/components/ui/GlassBackground';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 const COLOR_DANGER = AppTheme.color.danger;
 const COLOR_WARNING = AppTheme.color.warning;
@@ -77,19 +79,21 @@ const NotificationCard: React.FC<{ notification: Notification }> = ({ notificati
     return (
         <Pressable
             style={({ pressed }) => [
-                styles.notifCard,
-                { backgroundColor: pressed ? AppTheme.color.surfaceMuted : AppTheme.color.surface },
+                styles.notifPressable,
+                { opacity: pressed ? 0.78 : 1 },
             ]}
             onPress={() => Alert.alert(notification.title, notification.message)}
         >
-            <View style={[styles.notifIconWrapper, { backgroundColor: iconBgColor }]}>
-                <Feather name={notification.icon} size={24} color={iconColor} />
-            </View>
-            <View style={styles.notifContent}>
-                <Text style={[styles.notifTitle, { color: iconColor }]}>{notification.title}</Text>
-                <Text style={styles.notifMessage} numberOfLines={2}>{notification.message}</Text>
-                <Text style={styles.notifTime}>{notification.time}</Text>
-            </View>
+            <GlassPanel style={styles.notifCard} contentStyle={styles.notifCardContent} intensity={58} variant="strong">
+                <View style={[styles.notifIconWrapper, { backgroundColor: iconBgColor }]}>
+                    <Feather name={notification.icon} size={24} color={iconColor} />
+                </View>
+                <View style={styles.notifContent}>
+                    <Text style={[styles.notifTitle, { color: iconColor }]}>{notification.title}</Text>
+                    <Text style={styles.notifMessage} numberOfLines={2}>{notification.message}</Text>
+                    <Text style={styles.notifTime}>{notification.time}</Text>
+                </View>
+            </GlassPanel>
         </Pressable>
     );
 };
@@ -164,11 +168,12 @@ const NotificationsPage: React.FC = () => {
 
     return (
         <View style={styles.container}>
+            <GlassBackground />
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 116 }}>
-                <View style={styles.header}>
+                <GlassPanel style={styles.header} contentStyle={styles.headerInner} intensity={72} variant="strong">
                     <View style={styles.headerTitleRow}>
                         <View style={styles.headerIcon}>
-                            <Feather name="bell" size={22} color={AppTheme.color.primarySoft} />
+                            <Feather name="bell" size={22} color={AppTheme.color.primaryDark} />
                         </View>
                         <View style={styles.headerCopy}>
                             <Text style={styles.headerEyebrow}>System Log</Text>
@@ -199,7 +204,7 @@ const NotificationsPage: React.FC = () => {
                             </Text>
                         </Pressable>
                     </View>
-                </View>
+                </GlassPanel>
 
                 <View style={styles.contentArea}>
                     {errorMessage ? (
@@ -212,23 +217,23 @@ const NotificationsPage: React.FC = () => {
                     {isLoading ? (
                         <View style={styles.loadingState}>
                             {[0, 1, 2].map(item => (
-                                <View key={item} style={styles.loadingCard}>
+                                <GlassPanel key={item} style={styles.loadingCard} contentStyle={styles.loadingCardContent} intensity={50} variant="strong">
                                     <View style={styles.loadingIconBlock} />
                                     <View style={styles.loadingCopyBlock}>
                                         <View style={styles.loadingTitleBlock} />
                                         <View style={styles.loadingLineBlock} />
                                     </View>
-                                </View>
+                                </GlassPanel>
                             ))}
                         </View>
                     ) : Object.keys(groupedNotifications).length === 0 ? (
-                        <View style={styles.emptyState}>
+                        <GlassPanel style={styles.emptyState} contentStyle={styles.emptyStateContent} intensity={58} variant="strong">
                             <View style={styles.emptyIconWrap}>
                                 <Feather name="bell-off" size={34} color={AppTheme.color.textMuted} />
                             </View>
                             <Text style={styles.emptyStateText}>Tidak ada notifikasi saat ini.</Text>
                             <Text style={styles.emptyStateSubtitle}>Status sistem Anda dalam kondisi baik.</Text>
-                        </View>
+                        </GlassPanel>
                     ) : (
                         Object.keys(groupedNotifications).map(date => (
                             <View key={date} style={styles.dateGroup}>
@@ -253,15 +258,18 @@ const styles = StyleSheet.create({
         backgroundColor: AppTheme.color.canvas,
     },
     header: {
-        padding: 18,
         justifyContent: 'space-between',
         alignItems: 'stretch',
         marginTop: 25,
         marginBottom: 14,
         marginHorizontal: 16,
         borderRadius: AppTheme.radius.panel,
-        backgroundColor: AppTheme.color.surfaceStrong,
         minHeight: 166,
+    },
+    headerInner: {
+        padding: 18,
+        minHeight: 166,
+        justifyContent: 'space-between',
     },
     headerTitleRow: {
         flexDirection: 'row',
@@ -273,9 +281,9 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(223, 242, 233, 0.12)',
+        backgroundColor: AppTheme.color.primarySoft,
         borderWidth: 1,
-        borderColor: 'rgba(223, 242, 233, 0.18)',
+        borderColor: AppTheme.color.lineStrong,
         marginRight: 12,
     },
     headerCopy: {
@@ -283,7 +291,7 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     headerEyebrow: {
-        color: '#9fc8b7',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
         fontWeight: '800',
         marginBottom: 3,
@@ -291,10 +299,10 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 25,
         fontWeight: '900',
-        color: AppTheme.color.surface,
+        color: AppTheme.color.text,
     },
     headerSubtitle: {
-        color: '#c7d8d1',
+        color: AppTheme.color.textMuted,
         fontSize: 13,
         lineHeight: 18,
         marginTop: 4,
@@ -353,14 +361,13 @@ const styles = StyleSheet.create({
         paddingVertical: 6,
     },
     loadingCard: {
+        borderRadius: AppTheme.radius.card,
+        marginBottom: 10,
+    },
+    loadingCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        borderRadius: AppTheme.radius.card,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: AppTheme.color.line,
-        backgroundColor: AppTheme.color.surface,
     },
     loadingIconBlock: {
         width: 48,
@@ -391,23 +398,20 @@ const styles = StyleSheet.create({
     dateHeader: {
         fontSize: 16,
         fontWeight: '900',
-        color: AppTheme.color.text,
+        color: AppTheme.color.textOnGlass,
         marginBottom: 10,
         marginTop: 10,
     },
+    notifPressable: {
+        marginBottom: 10,
+    },
     notifCard: {
+        borderRadius: AppTheme.radius.card,
+    },
+    notifCardContent: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        borderRadius: AppTheme.radius.card,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: AppTheme.color.line,
-        shadowColor: AppTheme.shadow.color,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 1,
     },
     notifIconWrapper: {
         width: 50,
@@ -437,15 +441,14 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     emptyState: {
+        marginTop: 26,
+        borderRadius: AppTheme.radius.panel,
+    },
+    emptyStateContent: {
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 44,
         paddingHorizontal: 18,
-        marginTop: 26,
-        borderWidth: 1,
-        borderColor: AppTheme.color.line,
-        borderRadius: AppTheme.radius.panel,
-        backgroundColor: AppTheme.color.surface,
     },
     emptyIconWrap: {
         width: 68,

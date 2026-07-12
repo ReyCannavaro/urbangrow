@@ -23,6 +23,8 @@ import {
     normalizeActuatorStatus,
 } from '@/constants/api';
 import { AppTheme } from '@/constants/theme';
+import { GlassBackground } from '@/components/ui/GlassBackground';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 const COLOR_BLUE = AppTheme.color.info;
 const COLOR_YELLOW = AppTheme.color.warning;
@@ -113,7 +115,6 @@ interface MainControlCardProps extends ControlItem {
 
 const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, isDisabled, isOn, onToggle, ...item }) => {
     const cardStyle = {
-        backgroundColor: isOn ? AppTheme.color.primaryMist : AppTheme.color.surface,
         borderColor: isOn ? color : AppTheme.color.line,
     };
 
@@ -124,27 +125,28 @@ const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, i
     return (
         <Pressable 
             style={({ pressed }) => [
-                styles.mainControlCard, 
-                cardStyle,
+                styles.mainControlPressable,
                 { opacity: isDisabled ? 0.55 : pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
             ]}
             onPress={() => onToggle({ ...item, title, icon, color }, isOn ? 'OFF' : 'ON')}
             disabled={isDisabled}
         >
-            <View style={[styles.controlIconShell, { backgroundColor: isOn ? `${color}18` : AppTheme.color.neutralSoft }]}>
-                <Feather
-                    name={icon}
-                    size={30}
-                    color={iconColor}
-                />
-            </View>
-            <Text style={styles.controlTitleText}>{title}</Text>
-            
-            <View style={[styles.controlStatusButton, { backgroundColor: statusBgColor, borderColor: isOn ? color : AppTheme.color.lineStrong }]}>
-                <Text style={[styles.controlStatusText, { color: statusTextColor }]}>
-                    {isOn ? 'ON' : 'OFF'}
-                </Text>
-            </View>
+            <GlassPanel style={[styles.mainControlCard, cardStyle]} contentStyle={styles.mainControlContent} intensity={58} variant="strong">
+                <View style={[styles.controlIconShell, { backgroundColor: isOn ? `${color}18` : AppTheme.color.neutralSoft }]}>
+                    <Feather
+                        name={icon}
+                        size={30}
+                        color={iconColor}
+                    />
+                </View>
+                <Text style={styles.controlTitleText}>{title}</Text>
+                
+                <View style={[styles.controlStatusButton, { backgroundColor: statusBgColor, borderColor: isOn ? color : AppTheme.color.lineStrong }]}>
+                    <Text style={[styles.controlStatusText, { color: statusTextColor }]}>
+                        {isOn ? 'ON' : 'OFF'}
+                    </Text>
+                </View>
+            </GlassPanel>
         </Pressable>
     );
 };
@@ -171,9 +173,8 @@ const ActionPressable: React.FC<ActionCardProps> = ({
     return (
         <Pressable
             style={({ pressed }) => [
-                styles.actionCard,
+                styles.actionPressable,
                 {
-                  borderColor: `${actionColor}55`,
                   opacity: isDisabled ? 0.58 : pressed ? 0.7 : 1,
                   transform: [{ scale: pressed ? 0.95 : 1 }],
                 }
@@ -181,15 +182,22 @@ const ActionPressable: React.FC<ActionCardProps> = ({
             onPress={onPerformAction}
             disabled={isDisabled}
         >
-            <View style={[styles.actionIconShell, { backgroundColor: `${actionColor}18` }]}>
-            {isLoading ? (
-                <ActivityIndicator size="small" color={actionColor} />
-            ) : (
-                <Feather name={icon} size={24} color={actionColor} />
-            )}
-            </View>
-            <Text style={styles.actionTitle}>{title}</Text>
-            <Text style={styles.actionSubtitle}>{subtitle}</Text>
+            <GlassPanel
+                style={[styles.actionCard, { borderColor: `${actionColor}55` }]}
+                contentStyle={styles.actionContent}
+                intensity={58}
+                variant="strong"
+            >
+                <View style={[styles.actionIconShell, { backgroundColor: `${actionColor}18` }]}>
+                {isLoading ? (
+                    <ActivityIndicator size="small" color={actionColor} />
+                ) : (
+                    <Feather name={icon} size={24} color={actionColor} />
+                )}
+                </View>
+                <Text style={styles.actionTitle}>{title}</Text>
+                <Text style={styles.actionSubtitle}>{subtitle}</Text>
+            </GlassPanel>
         </Pressable>
     );
 };
@@ -197,7 +205,7 @@ const ActionPressable: React.FC<ActionCardProps> = ({
 const RecommendationCard: React.FC<{ item: RecommendationItem }> = ({ item }) => {
     return (
         <Pressable 
-            style={({ pressed }) => [styles.recommendationCard, { backgroundColor: pressed ? AppTheme.color.surfaceMuted : AppTheme.color.surface }]}
+            style={({ pressed }) => [styles.recommendationCard, { backgroundColor: pressed ? AppTheme.color.surfaceMuted : 'transparent' }]}
             onPress={() => Alert.alert('Rekomendasi', item.text)}
         >
             <View style={[styles.recommendationIconWrapper, { backgroundColor: `${item.color}18`, borderColor: `${item.color}40` }]}>
@@ -392,12 +400,13 @@ const ExplorePage: React.FC = () => {
 
     return (
         <View style={styles.container}>
+            <GlassBackground />
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 116 }}>
 
-                <View style={styles.header}>
+                <GlassPanel style={styles.header} contentStyle={styles.headerInner} intensity={72} variant="strong">
                     <View style={styles.headerTop}>
                         <View style={styles.headerIcon}>
-                            <Feather name="sliders" size={22} color={AppTheme.color.primarySoft} />
+                            <Feather name="sliders" size={22} color={AppTheme.color.primaryDark} />
                         </View>
                         <View style={styles.headerCopy}>
                             <Text style={styles.headerEyebrow}>Control Center</Text>
@@ -419,7 +428,7 @@ const ExplorePage: React.FC = () => {
                             <Text style={styles.headerMetaValue}>{syncStatus?.status ?? 'cek'}</Text>
                         </View>
                     </View>
-                </View>
+                </GlassPanel>
 
                 <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -445,11 +454,14 @@ const ExplorePage: React.FC = () => {
                         </View>
                     ) : null}
                     {latestActuatorCommand ? (
-                        <View
+                        <GlassPanel
                             style={[
                                 styles.commandStatusCard,
                                 { borderColor: getCommandStatusColor(latestActuatorCommand.status) },
                             ]}
+                            contentStyle={styles.commandStatusContent}
+                            intensity={58}
+                            variant="strong"
                         >
                             <View style={styles.commandStatusHeader}>
                                 <Text
@@ -470,7 +482,7 @@ const ExplorePage: React.FC = () => {
                             <Text style={styles.commandStatusHint}>
                                 Device: {latestActuatorCommand.device_id} | Attempts: {latestActuatorCommand.attempts}
                             </Text>
-                        </View>
+                        </GlassPanel>
                     ) : null}
                 </View>
 
@@ -479,7 +491,7 @@ const ExplorePage: React.FC = () => {
                         <Text style={styles.sectionTitle}>Input Sensor Manual</Text>
                         <Text style={styles.sectionSubtitle}>Untuk simulasi, kalibrasi, atau pengujian API.</Text>
                     </View>
-                    <View style={styles.manualSensorCard}>
+                    <GlassPanel style={styles.manualSensorCard} contentStyle={styles.manualSensorContent} intensity={60} variant="strong">
                         <View style={styles.manualInputRow}>
                             <View style={styles.manualInputGroup}>
                                 <Text style={styles.manualInputLabel}>Suhu</Text>
@@ -551,7 +563,7 @@ const ExplorePage: React.FC = () => {
                                 {isSensorSubmitting ? 'Mengirim...' : 'Kirim Data Sensor'}
                             </Text>
                         </Pressable>
-                    </View>
+                    </GlassPanel>
                 </View>
 
                 <View style={styles.section}>
@@ -578,11 +590,14 @@ const ExplorePage: React.FC = () => {
                         />
                     </View>
                     {syncStatus ? (
-                        <View
+                        <GlassPanel
                             style={[
                                 styles.syncStatusCard,
                                 { borderColor: getCommandStatusColor(syncStatus.status === 'stale' ? 'failed' : syncStatus.status === 'success' ? 'success' : 'pending') },
                             ]}
+                            contentStyle={styles.commandStatusContent}
+                            intensity={58}
+                            variant="strong"
                         >
                             <View style={styles.commandStatusHeader}>
                                 <Text style={styles.commandStatusMeta}>Sync System</Text>
@@ -609,7 +624,7 @@ const ExplorePage: React.FC = () => {
                             <Text style={styles.commandStatusHint}>
                                 Update sensor: {syncStatus.minutes_since_update ?? '-'} menit lalu
                             </Text>
-                        </View>
+                        </GlassPanel>
                     ) : null}
                 </View>
 
@@ -619,10 +634,8 @@ const ExplorePage: React.FC = () => {
                     </View>
                     <Pressable
                         style={({ pressed }) => [
-                            styles.feederCard,
-                            { 
-                                backgroundColor: isFeederActive ? AppTheme.color.primaryMist : AppTheme.color.surface,
-                                borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.line,
+                            styles.feederPressable,
+                            {
                                 opacity: pressed ? 0.95 : 1,
                             }
                         ]}
@@ -631,30 +644,40 @@ const ExplorePage: React.FC = () => {
                             Alert.alert('Feeder Otomatis', `Feeder Otomatis telah ${!isFeederActive ? 'diaktifkan' : 'dimatikan'}.`);
                         }}
                     >
-                        <View style={styles.controlInfo}>
-                            <Feather name="clock" size={24} color={isFeederActive ? AppTheme.color.primary : AppTheme.color.textMuted} />
-                            <Text style={[styles.feederTitle, { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.text }]}>
-                                Feeder Otomatis
-                            </Text>
-                        </View>
-                        <View
+                        <GlassPanel
                             style={[
-                                styles.controlStatusButton,
-                                {
-                                    backgroundColor: isFeederActive ? AppTheme.color.primarySoft : AppTheme.color.neutralSoft,
-                                    borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.lineStrong,
-                                },
+                                styles.feederCard,
+                                { borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.line },
                             ]}
+                            contentStyle={styles.feederContent}
+                            intensity={58}
+                            variant="strong"
                         >
-                            <Text
+                            <View style={styles.controlInfo}>
+                                <Feather name="clock" size={24} color={isFeederActive ? AppTheme.color.primary : AppTheme.color.textMuted} />
+                                <Text style={[styles.feederTitle, { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.text }]}>
+                                    Feeder Otomatis
+                                </Text>
+                            </View>
+                            <View
                                 style={[
-                                    styles.controlStatusText,
-                                    { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.textMuted },
+                                    styles.controlStatusButton,
+                                    {
+                                        backgroundColor: isFeederActive ? AppTheme.color.primarySoft : AppTheme.color.neutralSoft,
+                                        borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.lineStrong,
+                                    },
                                 ]}
                             >
-                                {isFeederActive ? 'ACTIVE' : 'INACTIVE'}
-                            </Text>
-                        </View>
+                                <Text
+                                    style={[
+                                        styles.controlStatusText,
+                                        { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.textMuted },
+                                    ]}
+                                >
+                                    {isFeederActive ? 'ACTIVE' : 'INACTIVE'}
+                                </Text>
+                            </View>
+                        </GlassPanel>
                     </Pressable>
                 </View>
 
@@ -663,11 +686,11 @@ const ExplorePage: React.FC = () => {
                         <Feather name="trending-up" size={20} color={AppTheme.color.primary} />
                         <Text style={styles.recommendationTitle}>Rekomendasi AI</Text>
                     </View>
-                    <View style={styles.recommendationList}>
+                    <GlassPanel style={styles.recommendationList} contentStyle={styles.recommendationContent} intensity={58} variant="strong">
                         {recommendationData.map(item => (
                             <RecommendationCard key={item.id} item={item} />
                         ))}
-                    </View>
+                    </GlassPanel>
                 </View>
 
             </ScrollView>
@@ -684,15 +707,18 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        padding: 18,
         justifyContent: 'space-between',
         alignItems: 'stretch',
         marginTop: 25,
         marginBottom: 14,
         marginHorizontal: 16,
         borderRadius: AppTheme.radius.panel,
-        backgroundColor: AppTheme.color.surfaceStrong,
         minHeight: 166,
+    },
+    headerInner: {
+        padding: 18,
+        minHeight: 166,
+        justifyContent: 'space-between',
     },
     headerTop: {
         flexDirection: 'row',
@@ -704,9 +730,9 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'rgba(223, 242, 233, 0.12)',
+        backgroundColor: AppTheme.color.primarySoft,
         borderWidth: 1,
-        borderColor: 'rgba(223, 242, 233, 0.18)',
+        borderColor: AppTheme.color.lineStrong,
         marginRight: 12,
     },
     headerCopy: {
@@ -714,7 +740,7 @@ const styles = StyleSheet.create({
         minWidth: 0,
     },
     headerEyebrow: {
-        color: '#9fc8b7',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
         fontWeight: '800',
         marginBottom: 3,
@@ -722,10 +748,10 @@ const styles = StyleSheet.create({
     headerTitle: {
         fontSize: 26,
         fontWeight: '900',
-        color: AppTheme.color.surface,
+        color: AppTheme.color.text,
     },
     headerSubtitle: {
-        color: '#c7d8d1',
+        color: AppTheme.color.textMuted,
         fontSize: 13,
         lineHeight: 18,
         marginTop: 4,
@@ -738,20 +764,20 @@ const styles = StyleSheet.create({
     headerMetaItem: {
         flex: 1,
         borderWidth: 1,
-        borderColor: 'rgba(223, 242, 233, 0.15)',
-        backgroundColor: 'rgba(223, 242, 233, 0.08)',
+        borderColor: AppTheme.color.line,
+        backgroundColor: 'rgba(255,255,255,0.30)',
         borderRadius: 14,
         paddingHorizontal: 10,
         paddingVertical: 8,
         marginRight: 8,
     },
     headerMetaLabel: {
-        color: '#91a9a0',
+        color: AppTheme.color.textMuted,
         fontSize: 11,
         fontWeight: '800',
     },
     headerMetaValue: {
-        color: AppTheme.color.surface,
+        color: AppTheme.color.text,
         fontSize: 13,
         fontWeight: '900',
         marginTop: 2,
@@ -767,10 +793,10 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 18,
         fontWeight: '900',
-        color: AppTheme.color.text,
+        color: AppTheme.color.textOnGlass,
     },
     sectionSubtitle: {
-        color: AppTheme.color.textSubtle,
+        color: AppTheme.color.textOnGlassMuted,
         fontSize: 12,
         lineHeight: 18,
         fontWeight: '700',
@@ -814,24 +840,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 5,
     },
     loadingText: {
-        color: AppTheme.color.textMuted,
+        color: AppTheme.color.textOnGlassMuted,
         fontSize: 13,
         fontWeight: '700',
         marginLeft: 8,
     },
     commandStatusCard: {
-        backgroundColor: AppTheme.color.surface,
-        borderWidth: 1,
         borderRadius: AppTheme.radius.card,
-        padding: 12,
         marginHorizontal: 0,
         marginBottom: 12,
     },
-    syncStatusCard: {
-        backgroundColor: AppTheme.color.surface,
-        borderWidth: 1,
-        borderRadius: AppTheme.radius.card,
+    commandStatusContent: {
         padding: 12,
+    },
+    syncStatusCard: {
+        borderRadius: AppTheme.radius.card,
         marginHorizontal: 0,
         marginTop: 2,
         marginBottom: 8,
@@ -863,20 +886,18 @@ const styles = StyleSheet.create({
         lineHeight: 16,
         marginTop: 4,
     },
-    mainControlCard: {
+    mainControlPressable: {
         flex: 1,
-        minHeight: 148,
+        marginHorizontal: 5,
+    },
+    mainControlCard: {
         borderRadius: AppTheme.radius.card,
+    },
+    mainControlContent: {
+        minHeight: 148,
         padding: 14,
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginHorizontal: 5,
-        borderWidth: 1,
-        shadowColor: AppTheme.shadow.color,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.05,
-        shadowRadius: 14,
-        elevation: 2,
     },
     controlIconShell: {
         width: 54,
@@ -905,10 +926,9 @@ const styles = StyleSheet.create({
     },
 
     manualSensorCard: {
-        backgroundColor: AppTheme.color.surface,
-        borderWidth: 1,
-        borderColor: AppTheme.color.line,
         borderRadius: AppTheme.radius.panel,
+    },
+    manualSensorContent: {
         padding: 14,
     },
     manualInputRow: {
@@ -949,7 +969,7 @@ const styles = StyleSheet.create({
         paddingVertical: 9,
         paddingHorizontal: 10,
         marginBottom: 8,
-        backgroundColor: AppTheme.color.surface,
+        backgroundColor: 'rgba(255,255,255,0.56)',
         alignItems: 'center',
     },
     presetButtonText: {
@@ -976,14 +996,16 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
-    actionCard: {
+    actionPressable: {
         flex: 1,
+        marginHorizontal: 5,
+    },
+    actionCard: {
+        borderRadius: AppTheme.radius.card,
+    },
+    actionContent: {
         alignItems: 'flex-start',
         padding: 14,
-        marginHorizontal: 5,
-        borderRadius: AppTheme.radius.card,
-        borderWidth: 1,
-        backgroundColor: AppTheme.color.surface,
         minHeight: 130,
     },
     actionIconShell: {
@@ -1006,13 +1028,17 @@ const styles = StyleSheet.create({
         marginTop: 3,
     },
 
+    feederPressable: {
+        width: '100%',
+    },
     feederCard: {
+        borderRadius: AppTheme.radius.panel,
+    },
+    feederContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 16,
-        borderRadius: AppTheme.radius.panel,
-        borderWidth: 1,
     },
     controlInfo: {
         flexDirection: 'row',
@@ -1032,15 +1058,14 @@ const styles = StyleSheet.create({
     recommendationTitle: {
         fontSize: 18,
         fontWeight: '900',
-        color: AppTheme.color.text,
+        color: AppTheme.color.textOnGlass,
         marginLeft: 8,
     },
     recommendationList: {
-        backgroundColor: AppTheme.color.surface,
         borderRadius: AppTheme.radius.panel,
+    },
+    recommendationContent: {
         paddingVertical: 5,
-        borderWidth: 1,
-        borderColor: AppTheme.color.line,
     },
     recommendationCard: {
         flexDirection: 'row',

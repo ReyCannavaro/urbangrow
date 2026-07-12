@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AppTheme } from '@/constants/theme';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 interface DataCardProps {
   title: string;
@@ -22,7 +23,7 @@ export const DataCard: React.FC<DataCardProps> = ({
   iconColor,
   borderColor,
 }) => (
-  <View style={styles.card}>
+  <GlassPanel style={styles.card} contentStyle={styles.cardContent} intensity={64} variant="strong">
     <View style={[styles.accentRail, { backgroundColor: borderColor }]} />
     <View style={styles.cardHeader}>
       <View>
@@ -37,7 +38,7 @@ export const DataCard: React.FC<DataCardProps> = ({
       <Text style={styles.cardValue}>{value}</Text>
       <Text style={styles.cardUnit}>{unit}</Text>
     </View>
-  </View>
+  </GlassPanel>
 );
 
 const styles = StyleSheet.create({
@@ -45,16 +46,10 @@ const styles = StyleSheet.create({
     width: '48.5%',
     minHeight: 146,
     borderRadius: AppTheme.radius.card,
+  },
+  cardContent: {
+    minHeight: 144,
     padding: 14,
-    borderWidth: 1,
-    borderColor: AppTheme.color.line,
-    backgroundColor: AppTheme.color.surface,
-    overflow: 'hidden',
-    shadowColor: AppTheme.shadow.color,
-    shadowOffset: AppTheme.shadow.offset,
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
-    elevation: 3,
   },
   accentRail: {
     position: 'absolute',

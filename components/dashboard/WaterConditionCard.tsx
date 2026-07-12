@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { analyzeWaterCondition } from '@/utils/waterAnalysis';
 import { AppTheme } from '@/constants/theme';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 interface WaterConditionCardProps {
   currentTemp: number;
@@ -40,7 +41,7 @@ export const WaterConditionCard: React.FC<WaterConditionCardProps> = ({
 
   if (isLoading && currentTemp === 0) {
     return (
-      <View style={[styles.card, styles.oxygenCard]}>
+      <GlassPanel style={styles.oxygenCard} contentStyle={styles.card} intensity={62} variant="strong">
         <View style={styles.loadingState}>
           <View style={styles.loadingIcon}>
             <Feather name="activity" size={22} color={AppTheme.color.textMuted} />
@@ -50,7 +51,7 @@ export const WaterConditionCard: React.FC<WaterConditionCardProps> = ({
             <Text style={styles.loadingText}>Mengambil pembacaan terbaru dari API.</Text>
           </View>
         </View>
-      </View>
+      </GlassPanel>
     );
   }
 
@@ -58,7 +59,7 @@ export const WaterConditionCard: React.FC<WaterConditionCardProps> = ({
   const formattedTime = new Date(lastUpdate).toLocaleTimeString('id-ID', timeOptions);
 
   return (
-    <View style={[styles.card, styles.oxygenCard]}>
+    <GlassPanel style={styles.oxygenCard} contentStyle={styles.card} intensity={62} variant="strong">
       <View style={styles.oxygenHeader}>
         <View>
           <Text style={styles.oxygenKicker}>Water condition</Text>
@@ -83,18 +84,14 @@ export const WaterConditionCard: React.FC<WaterConditionCardProps> = ({
         </View>
       </View>
       <Text style={styles.conclusionText}>{conclusion}</Text>
-    </View>
+    </GlassPanel>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: AppTheme.radius.panel,
     padding: 16,
-    borderWidth: 1,
-    borderColor: AppTheme.color.line,
-    backgroundColor: AppTheme.color.surface,
   },
   cardNormalLabel: {
     fontSize: 11,
@@ -108,6 +105,7 @@ const styles = StyleSheet.create({
   oxygenCard: {
     width: '100%',
     marginBottom: 16,
+    borderRadius: AppTheme.radius.panel,
   },
   oxygenHeader: {
     flexDirection: 'row',

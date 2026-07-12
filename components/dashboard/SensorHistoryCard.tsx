@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AppTheme } from '@/constants/theme';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 import { SensorData } from '@/services/sensorService';
 import { formatHistoryTime, getTrend } from '@/utils/sensorHistory';
 
@@ -175,7 +176,7 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
   const phTrend = getTrend(chartHistory, 'ph');
 
   return (
-    <View style={styles.historyCard}>
+    <GlassPanel style={styles.historyCard} contentStyle={styles.historyContent} intensity={62} variant="strong">
       <View style={styles.historyHeader}>
         <View>
           <Text style={styles.historyTitle}>Riwayat Sensor</Text>
@@ -258,19 +259,18 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
           ))
         )}
       </View>
-    </View>
+    </GlassPanel>
   );
 };
 
 const styles = StyleSheet.create({
   historyCard: {
     width: '100%',
-    backgroundColor: AppTheme.color.surface,
-    borderWidth: 1,
-    borderColor: AppTheme.color.line,
     borderRadius: AppTheme.radius.panel,
-    padding: 16,
     marginBottom: 16,
+  },
+  historyContent: {
+    padding: 16,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   rangeButtonActive: {
-    backgroundColor: AppTheme.color.surface,
+    backgroundColor: 'rgba(255,255,255,0.72)',
     shadowColor: AppTheme.shadow.color,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     borderColor: AppTheme.color.line,
     borderRadius: AppTheme.radius.card,
     padding: 12,
-    backgroundColor: AppTheme.color.surfaceMuted,
+    backgroundColor: 'rgba(255,255,255,0.30)',
     marginBottom: 10,
   },
   trendLabel: {
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: AppTheme.color.line,
     borderRadius: AppTheme.radius.input,
-    backgroundColor: AppTheme.color.surface,
+    backgroundColor: 'rgba(255,255,255,0.42)',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   historyTableHeader: {
     flexDirection: 'row',
-    backgroundColor: AppTheme.color.neutralSoft,
+    backgroundColor: 'rgba(255,255,255,0.34)',
     paddingVertical: 8,
   },
   historyTableRow: {

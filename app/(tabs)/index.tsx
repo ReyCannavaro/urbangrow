@@ -5,6 +5,8 @@ import { DataCard } from '@/components/dashboard/DataCard';
 import { SensorHistoryCard } from '@/components/dashboard/SensorHistoryCard';
 import { StatusButton } from '@/components/dashboard/StatusButton';
 import { WaterConditionCard } from '@/components/dashboard/WaterConditionCard';
+import { GlassBackground } from '@/components/ui/GlassBackground';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 import { AppTheme } from '@/constants/theme';
 import { useDashboardData } from '@/hooks/use-dashboard-data';
 
@@ -27,8 +29,9 @@ const HomePage: React.FC = () => {
 
   return (
     <View style={styles.container}>
+      <GlassBackground />
       {errorMessage ? (
-        <View style={styles.customAlert}>
+        <GlassPanel style={styles.customAlert} contentStyle={styles.customAlertContent} intensity={70} variant="strong">
           <View style={styles.customAlertHeader}>
             <Feather name="wifi-off" size={18} color={AppTheme.color.danger} />
             <Text style={styles.customAlertTitle}>Koneksi Gagal</Text>
@@ -37,13 +40,13 @@ const HomePage: React.FC = () => {
           <Text style={styles.customAlertButtonText} onPress={clearErrorMessage}>
             Tutup
           </Text>
-        </View>
+        </GlassPanel>
       ) : null}
 
-      <View style={styles.header}>
+      <GlassPanel style={styles.header} contentStyle={styles.headerInner} intensity={72} variant="strong">
         <View style={styles.headerContent}>
           <View style={styles.brandMark}>
-            <Feather name="cpu" size={22} color={AppTheme.color.primarySoft} />
+            <Feather name="cpu" size={22} color={AppTheme.color.primaryDark} />
           </View>
           <View style={styles.headerCopy}>
             <Text style={styles.headerEyebrow}>Urban Farm 1</Text>
@@ -57,7 +60,7 @@ const HomePage: React.FC = () => {
             {connectionLabel}
           </Text>
         </View>
-      </View>
+      </GlassPanel>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.dataRow}>
@@ -131,15 +134,18 @@ const styles = StyleSheet.create({
     backgroundColor: AppTheme.color.canvas,
   },
   header: {
-    padding: 18,
     justifyContent: 'space-between',
     alignItems: 'stretch',
     marginTop: 25,
     marginBottom: 14,
     marginHorizontal: 16,
     borderRadius: AppTheme.radius.panel,
-    backgroundColor: AppTheme.color.surfaceStrong,
     minHeight: 144,
+  },
+  headerInner: {
+    padding: 18,
+    minHeight: 144,
+    justifyContent: 'space-between',
   },
   headerContent: {
     flexDirection: 'row',
@@ -151,9 +157,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(223, 242, 233, 0.12)',
+    backgroundColor: AppTheme.color.primarySoft,
     borderWidth: 1,
-    borderColor: 'rgba(223, 242, 233, 0.18)',
+    borderColor: AppTheme.color.lineStrong,
     marginRight: 12,
   },
   headerCopy: {
@@ -161,7 +167,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerEyebrow: {
-    color: '#9fc8b7',
+    color: AppTheme.color.textMuted,
     fontSize: 12,
     fontWeight: '800',
     marginBottom: 3,
@@ -169,11 +175,11 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 26,
     fontWeight: '900',
-    color: AppTheme.color.surface,
+    color: AppTheme.color.text,
     letterSpacing: 0,
   },
   headerSubtext: {
-    color: '#c7d8d1',
+    color: AppTheme.color.textMuted,
     fontSize: 13,
     lineHeight: 18,
     marginTop: 4,
@@ -213,11 +219,11 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: AppTheme.color.text,
+    color: AppTheme.color.textOnGlass,
   },
   statusSubtitle: {
     fontSize: 12,
-    color: AppTheme.color.textSubtle,
+    color: AppTheme.color.textOnGlassMuted,
     marginTop: 3,
     fontWeight: '700',
   },
@@ -227,7 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AppTheme.color.primarySoft,
+    backgroundColor: 'rgba(247,255,251,0.82)',
   },
   statusGrid: {
     flexDirection: 'row',
@@ -246,8 +252,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
     margin: 16,
     marginTop: 50,
-    padding: 14,
-    backgroundColor: AppTheme.color.dangerSoft,
+    backgroundColor: 'transparent',
     borderColor: '#f4b7ae',
     borderWidth: 1,
     borderRadius: AppTheme.radius.card,
@@ -256,6 +261,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 8,
+  },
+  customAlertContent: {
+    padding: 14,
   },
   customAlertHeader: {
     flexDirection: 'row',

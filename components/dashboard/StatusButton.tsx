@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { AppTheme } from '@/constants/theme';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
 interface StatusButtonProps {
   label: string;
@@ -14,7 +15,7 @@ export const StatusButton: React.FC<StatusButtonProps> = ({ label, value, border
   const displayValue = isBinaryStatus ? (isActiveStatus ? 'Aktif' : 'Standby') : value;
 
   return (
-    <View style={styles.statusButton}>
+    <GlassPanel style={styles.statusButton} contentStyle={styles.statusContent} intensity={58} variant="strong">
       <View style={styles.statusHeader}>
         <Text style={styles.statusButtonLabel}>{label}</Text>
         {isBinaryStatus ? (
@@ -46,7 +47,7 @@ export const StatusButton: React.FC<StatusButtonProps> = ({ label, value, border
       >
         {displayValue}
       </Text>
-    </View>
+    </GlassPanel>
   );
 };
 
@@ -54,11 +55,11 @@ const styles = StyleSheet.create({
   statusButton: {
     width: '48.5%',
     borderRadius: AppTheme.radius.card,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: AppTheme.color.line,
     marginBottom: 12,
-    backgroundColor: AppTheme.color.surface,
+  },
+  statusContent: {
+    padding: 14,
+    minHeight: 92,
   },
   statusHeader: {
     flexDirection: 'row',
