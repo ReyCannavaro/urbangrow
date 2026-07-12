@@ -16,6 +16,7 @@ DATABASE_PATH = os.getenv(
     os.path.join(os.path.dirname(__file__), "urban_grow.db"),
 )
 DEFAULT_TEMPERATURE = 25.5
+NOTIFICATION_DEDUPE_MINUTES = 5
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 AGRIBOT_SYSTEM_PROMPT = (
@@ -79,6 +80,20 @@ def init_db() -> None:
                 pumpStatus TEXT NOT NULL CHECK (pumpStatus IN ('ON', 'OFF')),
                 lightStatus TEXT NOT NULL CHECK (lightStatus IN ('ON', 'OFF')),
                 updated_at TEXT NOT NULL
+            )
+            """
+        )
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                type TEXT NOT NULL CHECK (type IN ('critical', 'warning', 'info')),
+                icon TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                is_read INTEGER NOT NULL DEFAULT 0,
+                is_cleared INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -154,6 +169,7 @@ def normalize_sensor_payload(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def insert_sensor_reading(reading: dict[str, Any]) -> dict[str, Any]:
+    previous_actuator = get_actuator_status()
     actuator = calculate_actuator_status(
         reading["temperature"],
         reading["ph"],
@@ -186,6 +202,8 @@ def insert_sensor_reading(reading: dict[str, Any]) -> dict[str, Any]:
             (actuator["pumpStatus"], actuator["lightStatus"], utc_now()),
         )
         reading_id = cursor.lastrowid
+
+    persist_sensor_notifications(reading, previous_actuator, actuator)
 
     return {**reading, "id": reading_id, "actuator": actuator}
 
@@ -257,6 +275,16 @@ def update_actuator_status(data: dict[str, Any]) -> dict[str, Any]:
             "SELECT pumpStatus, lightStatus, updated_at FROM actuator_status WHERE id = 1"
         ).fetchone()
 
+    actuator_label = "Pompa Air" if key == "pumpStatus" else "Lampu Grow"
+    actuator_icon = "droplet" if key == "pumpStatus" else "sun"
+    insert_notification(
+        f"{actuator_label} Diubah",
+        f"{actuator_label} disetel ke {value} dari kontrol aplikasi.",
+        "info",
+        actuator_icon,
+        dedupe_minutes=None,
+    )
+
     return dict(row)
 
 
@@ -266,6 +294,23 @@ def notification_time(timestamp: str | None) -> str:
         return datetime.now().strftime("%H:%M")
 
     return parsed_time.astimezone().strftime("%H:%M")
+
+
+def notification_date(timestamp: str | None) -> str:
+    parsed_time = parse_timestamp(timestamp)
+    if parsed_time is None:
+        return "Hari Ini"
+
+    local_date = parsed_time.astimezone().date()
+    today = datetime.now().astimezone().date()
+    days_ago = (today - local_date).days
+
+    if days_ago == 0:
+        return "Hari Ini"
+    if days_ago == 1:
+        return "Kemarin"
+
+    return local_date.strftime("%d/%m/%Y")
 
 
 def create_notification(
@@ -283,11 +328,172 @@ def create_notification(
         "type": notification_type,
         "icon": icon,
         "time": notification_time(timestamp),
-        "date": "Hari Ini",
+        "date": notification_date(timestamp),
     }
 
 
-def get_notifications() -> list[dict[str, Any]]:
+def insert_notification(
+    title: str,
+    message: str,
+    notification_type: str,
+    icon: str,
+    timestamp: str | None = None,
+    dedupe_minutes: int | None = NOTIFICATION_DEDUPE_MINUTES,
+) -> int | None:
+    created_at = timestamp or utc_now()
+
+    with get_db() as db:
+        if dedupe_minutes is not None:
+            latest_row = db.execute(
+                """
+                SELECT timestamp
+                FROM notifications
+                WHERE title = ? AND is_cleared = 0
+                ORDER BY timestamp DESC, id DESC
+                LIMIT 1
+                """,
+                (title,),
+            ).fetchone()
+
+            if latest_row is not None:
+                latest_time = parse_timestamp(latest_row["timestamp"])
+                current_time = parse_timestamp(created_at)
+                if latest_time is not None and current_time is not None:
+                    minutes_since_latest = (current_time - latest_time).total_seconds() / 60
+                    if minutes_since_latest < dedupe_minutes:
+                        return None
+
+        cursor = db.execute(
+            """
+            INSERT INTO notifications
+                (title, message, type, icon, timestamp)
+            VALUES
+                (?, ?, ?, ?, ?)
+            """,
+            (title, message, notification_type, icon, created_at),
+        )
+
+    return cursor.lastrowid
+
+
+def persist_sensor_notifications(
+    reading: dict[str, Any],
+    previous_actuator: dict[str, Any],
+    actuator: dict[str, str],
+) -> None:
+    timestamp = reading.get("timestamp")
+    temperature = float(reading["temperature"])
+    ph = float(reading["ph"])
+    ldr_value = int(reading["ldr_value"])
+
+    if ph < 6.0:
+        insert_notification(
+            "PH Kritis Rendah",
+            f"Kadar pH air berada di {ph:.2f}. Segera naikkan pH agar ikan dan tanaman tetap aman.",
+            "critical",
+            "alert-triangle",
+            timestamp,
+        )
+    elif ph > 7.5:
+        insert_notification(
+            "PH Terlalu Basa",
+            f"Kadar pH air berada di {ph:.2f}. Koreksi pH agar nutrisi tetap mudah diserap.",
+            "warning",
+            "droplet",
+            timestamp,
+        )
+
+    if temperature > 30:
+        insert_notification(
+            "Suhu Air Tinggi",
+            f"Suhu air mencapai {temperature:.1f} derajat C. Pertimbangkan pendinginan atau sirkulasi tambahan.",
+            "warning",
+            "thermometer",
+            timestamp,
+        )
+    elif temperature < 20:
+        insert_notification(
+            "Suhu Air Rendah",
+            f"Suhu air turun ke {temperature:.1f} derajat C. Periksa lingkungan kolam dan stabilkan suhu.",
+            "warning",
+            "thermometer",
+            timestamp,
+        )
+
+    if ldr_value < 300:
+        insert_notification(
+            "Cahaya Rendah",
+            f"Nilai LDR {ldr_value}. Lampu grow perlu aktif agar tanaman tetap mendapat cahaya.",
+            "info",
+            "sun",
+            timestamp,
+        )
+
+    if previous_actuator.get("pumpStatus") != actuator["pumpStatus"] and actuator["pumpStatus"] == "ON":
+        insert_notification(
+            "Pompa Air Aktif",
+            "Pompa otomatis ON untuk menjaga sirkulasi dan menstabilkan kualitas air.",
+            "info",
+            "droplet",
+            timestamp,
+            dedupe_minutes=None,
+        )
+
+    if previous_actuator.get("lightStatus") != actuator["lightStatus"] and actuator["lightStatus"] == "ON":
+        insert_notification(
+            "Lampu Grow Aktif",
+            "Lampu grow otomatis ON karena intensitas cahaya terdeteksi rendah.",
+            "info",
+            "sun",
+            timestamp,
+            dedupe_minutes=None,
+        )
+
+
+def get_persisted_notifications(limit: int = 50) -> list[dict[str, Any]]:
+    limit = max(1, min(limit, 100))
+    with get_db() as db:
+        rows = db.execute(
+            """
+            SELECT id, title, message, type, icon, timestamp, is_read
+            FROM notifications
+            WHERE is_cleared = 0
+            ORDER BY timestamp DESC, id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+
+    return [
+        {
+            **create_notification(
+                int(row["id"]),
+                row["title"],
+                row["message"],
+                row["type"],
+                row["icon"],
+                row["timestamp"],
+            ),
+            "is_read": bool(row["is_read"]),
+        }
+        for row in rows
+    ]
+
+
+def clear_notifications() -> int:
+    with get_db() as db:
+        cursor = db.execute(
+            """
+            UPDATE notifications
+            SET is_cleared = 1
+            WHERE is_cleared = 0
+            """
+        )
+
+    return cursor.rowcount
+
+
+def build_live_notifications() -> list[dict[str, Any]]:
     latest_reading = get_latest_reading()
     actuator_status = get_actuator_status()
     notifications: list[dict[str, Any]] = []
@@ -431,6 +637,14 @@ def get_notifications() -> list[dict[str, Any]]:
     return notifications
 
 
+def get_notifications(limit: int = 50) -> list[dict[str, Any]]:
+    persisted_notifications = get_persisted_notifications(limit)
+    if persisted_notifications:
+        return persisted_notifications
+
+    return build_live_notifications()
+
+
 def get_gemini_api_key() -> str | None:
     return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
 
@@ -533,7 +747,11 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/notifications":
-            self.send_json(200, get_notifications())
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except ValueError:
+                limit = 50
+            self.send_json(200, get_notifications(limit))
             return
 
         self.send_json(404, {"error": "Endpoint tidak ditemukan."})
@@ -568,6 +786,17 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
                 return
 
             self.send_json(200, status)
+            return
+
+        if path == "/api/notifications/clear":
+            cleared_count = clear_notifications()
+            self.send_json(
+                200,
+                {
+                    "message": "Notifikasi berhasil dibersihkan.",
+                    "cleared": cleared_count,
+                },
+            )
             return
 
         if path == "/api/chat":

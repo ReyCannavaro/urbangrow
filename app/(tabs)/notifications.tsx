@@ -11,7 +11,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { apiGet } from '@/constants/api';
+import { apiGet, apiPost } from '@/constants/api';
 
 const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
 const COLOR_DANGER = '#ef4444';
@@ -26,6 +26,11 @@ interface Notification {
     time: string;
     icon: keyof typeof Feather.glyphMap;
     date: string;
+}
+
+interface ClearNotificationsResponse {
+    message: string;
+    cleared: number;
 }
 
 const fallbackNotifications: Notification[] = [
@@ -94,6 +99,7 @@ const NotificationsPage: React.FC = () => {
     const insets = useSafeAreaInsets();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isClearing, setIsClearing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
 
     const fetchNotifications = useCallback(async () => {
@@ -125,6 +131,22 @@ const NotificationsPage: React.FC = () => {
         return acc;
     }, {} as Record<string, Notification[]>);
 
+    const clearAllNotifications = async () => {
+        setIsClearing(true);
+
+        try {
+            await apiPost<ClearNotificationsResponse>('/api/notifications/clear', {});
+            setNotifications([]);
+            setErrorMessage('');
+        } catch (error) {
+            console.warn('Failed to clear persisted notifications:', error);
+            setNotifications([]);
+            setErrorMessage('API belum dapat menghapus riwayat. Notifikasi hanya dibersihkan dari tampilan saat ini.');
+        } finally {
+            setIsClearing(false);
+        }
+    };
+
     const handleClearAll = () => {
         if (notifications.length === 0) {
             Alert.alert('Kosong', 'Tidak ada notifikasi untuk dihapus.');
@@ -133,10 +155,10 @@ const NotificationsPage: React.FC = () => {
 
         Alert.alert(
             'Konfirmasi',
-            'Anda yakin ingin menghapus semua notifikasi dari tampilan saat ini?',
+            'Anda yakin ingin menghapus semua riwayat notifikasi?',
             [
                 { text: 'Batal', style: 'cancel' },
-                { text: 'Hapus', style: 'destructive', onPress: () => setNotifications([]) },
+                { text: 'Hapus', style: 'destructive', onPress: clearAllNotifications },
             ],
         );
     };
@@ -162,9 +184,16 @@ const NotificationsPage: React.FC = () => {
                         <Pressable
                             onPress={handleClearAll}
                             style={({ pressed }) => [styles.clearButton, { opacity: pressed ? 0.7 : 1 }]}
+                            disabled={isClearing}
                         >
-                            <Feather name="trash-2" size={18} color="#fff" />
-                            <Text style={styles.clearButtonText}>Hapus Semua</Text>
+                            {isClearing ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <Feather name="trash-2" size={18} color="#fff" />
+                            )}
+                            <Text style={styles.clearButtonText}>
+                                {isClearing ? 'Menghapus...' : 'Hapus Semua'}
+                            </Text>
                         </Pressable>
                     </View>
                 </LinearGradient>
