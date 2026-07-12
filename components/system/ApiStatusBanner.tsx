@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '@/constants/api';
+import { AppTheme } from '@/constants/theme';
 import { useApiStatus } from '@/hooks/use-api-status';
 
 const formatLastChecked = (date: Date | null) => {
@@ -78,25 +79,25 @@ export const ApiStatusBanner = () => {
 const styles = StyleSheet.create({
   banner: {
     position: 'absolute',
-    left: 14,
-    right: 14,
+    left: 16,
+    right: 16,
     zIndex: 200,
     elevation: 20,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: AppTheme.radius.card,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    shadowColor: '#7f1d1d',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
+    shadowColor: AppTheme.shadow.color,
+    shadowOffset: AppTheme.shadow.offset,
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
   },
   iconWrap: {
     width: 30,
     height: 30,
-    borderRadius: 15,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -107,7 +108,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   message: {
     fontSize: 11,
@@ -126,38 +127,38 @@ const styles = StyleSheet.create({
 
 const offlineTone = StyleSheet.create({
   banner: {
-    borderColor: '#fecaca',
-    backgroundColor: '#fef2f2',
+    borderColor: '#f4b7ae',
+    backgroundColor: AppTheme.color.dangerSoft,
   },
   iconWrap: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#f9d1ca',
   },
   title: {
-    color: '#991b1b',
+    color: AppTheme.color.danger,
   },
   message: {
-    color: '#b91c1c',
+    color: '#8f332b',
   },
   icon: {
-    color: '#b91c1c',
+    color: AppTheme.color.danger,
   },
 });
 
 const staleTone = StyleSheet.create({
   banner: {
-    borderColor: '#fde68a',
-    backgroundColor: '#fffbeb',
+    borderColor: '#f3d48b',
+    backgroundColor: AppTheme.color.warningSoft,
   },
   iconWrap: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#f7e5b7',
   },
   title: {
-    color: '#92400e',
+    color: '#8f5c08',
   },
   message: {
-    color: '#b45309',
+    color: '#9b6a16',
   },
   icon: {
-    color: '#b45309',
+    color: AppTheme.color.warning,
   },
 });

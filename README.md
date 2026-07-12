@@ -174,6 +174,10 @@ npm run web
 | `GET` | `/api/actuator-commands/next?device_id=esp32-main` | ESP mengambil command pending berikutnya |
 | `POST` | `/api/actuator-commands/ack` | ESP mengirim hasil eksekusi command |
 | `GET` | `/api/actuator-logs?limit=50` | Ambil log perubahan aktuator |
+| `POST` | `/api/sync-device` | Buat request sync/reconnect perangkat |
+| `GET` | `/api/sync-status` | Ambil status sync dan stale sensor |
+| `GET` | `/api/sync-device/next?device_id=esp32-main` | ESP mengambil request sync pending |
+| `POST` | `/api/sync-device/ack` | ESP mengirim hasil sync |
 | `GET` | `/api/notifications` | Ambil notifikasi real |
 | `POST` | `/api/notifications/clear` | Bersihkan riwayat notifikasi |
 | `POST` | `/api/chat` | Kirim pesan ke AgriBot |
@@ -276,6 +280,54 @@ Topic dapat diubah lewat:
 
 ```bash
 set URBANGROW_MQTT_COMMAND_TOPIC=urbangrow/actuator/commands
+```
+
+## Sync System
+
+Sync System dipakai untuk meminta ESP menyambungkan ulang sensor saat data macet atau tidak update.
+
+Konfigurasi opsional:
+
+```bash
+set URBANGROW_ESP_HTTP_SYNC_URL=http://192.168.1.50/sync
+set URBANGROW_MQTT_SYNC_TOPIC=urbangrow/device/sync
+set URBANGROW_SYNC_STALE_MINUTES=5
+set URBANGROW_SYNC_COOLDOWN_SECONDS=120
+```
+
+Request sync manual:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/sync-device `
+  -H "Content-Type: application/json" `
+  -d "{\"trigger\":\"manual\",\"reason\":\"Data sensor tidak update\",\"force\":true}"
+```
+
+ESP polling request sync:
+
+```powershell
+curl.exe "http://localhost:5000/api/sync-device/next?device_id=esp32-main"
+```
+
+ESP ack setelah reconnect:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/sync-device/ack `
+  -H "Content-Type: application/json" `
+  -d "{\"sync_id\":1,\"status\":\"success\",\"message\":\"Sensor reconnect berhasil\"}"
+```
+
+Payload sync untuk ESP:
+
+```json
+{
+  "sync_id": 1,
+  "device_id": "esp32-main",
+  "action": "reconnect_sensor",
+  "mqtt_topic": "urbangrow/device/sync",
+  "reason": "Data sensor tidak update",
+  "requested_at": "2026-07-12T06:00:00+00:00"
+}
 ```
 
 ## Validasi

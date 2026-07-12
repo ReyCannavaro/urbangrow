@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppTheme } from '@/constants/theme';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 import { SensorData } from '@/services/sensorService';
 import { formatHistoryTime, getTrend } from '@/utils/sensorHistory';
 
@@ -174,7 +176,7 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
   const phTrend = getTrend(chartHistory, 'ph');
 
   return (
-    <View style={styles.historyCard}>
+    <GlassPanel style={styles.historyCard} contentStyle={styles.historyContent} intensity={62} variant="strong">
       <View style={styles.historyHeader}>
         <View>
           <Text style={styles.historyTitle}>Riwayat Sensor</Text>
@@ -183,11 +185,7 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
         <Text
           style={[
             styles.cardNormalLabel,
-            {
-              borderColor: isConnected ? '#10b981' : '#ef4444',
-              color: isConnected ? '#10b981' : '#ef4444',
-              backgroundColor: '#fff',
-            },
+            isConnected ? styles.badgeOnline : styles.badgeOffline,
           ]}
         >
           {history.length} Data
@@ -218,7 +216,7 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
           <LineSensorChart
             history={chartHistory}
             metric="temperature"
-            color="#3b82f6"
+            color={AppTheme.color.info}
             minValue={10}
             maxValue={40}
             safeMin={20}
@@ -232,7 +230,7 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
           <LineSensorChart
             history={chartHistory}
             metric="ph"
-            color="#10b981"
+            color={AppTheme.color.primary}
             minValue={4}
             maxValue={10}
             safeMin={6}
@@ -261,19 +259,18 @@ export const SensorHistoryCard: React.FC<{ history: SensorData[]; isConnected: b
           ))
         )}
       </View>
-    </View>
+    </GlassPanel>
   );
 };
 
 const styles = StyleSheet.create({
   historyCard: {
     width: '100%',
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 20,
+    borderRadius: AppTheme.radius.panel,
+    marginBottom: 16,
+  },
+  historyContent: {
+    padding: 16,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -283,27 +280,38 @@ const styles = StyleSheet.create({
   },
   historyTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
+    fontWeight: '900',
+    color: AppTheme.color.text,
   },
   historySubtitle: {
     fontSize: 12,
-    color: '#6b7280',
+    color: AppTheme.color.textSubtle,
     marginTop: 3,
+    fontWeight: '700',
   },
   cardNormalLabel: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '900',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    borderRadius: AppTheme.radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     alignSelf: 'flex-start',
+  },
+  badgeOnline: {
+    borderColor: AppTheme.color.primary,
+    color: AppTheme.color.primaryDark,
+    backgroundColor: AppTheme.color.primarySoft,
+  },
+  badgeOffline: {
+    borderColor: AppTheme.color.danger,
+    color: AppTheme.color.danger,
+    backgroundColor: AppTheme.color.dangerSoft,
   },
   rangeSelector: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+    backgroundColor: AppTheme.color.neutralSoft,
+    borderRadius: AppTheme.radius.input,
     padding: 4,
     marginBottom: 12,
   },
@@ -315,40 +323,40 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   rangeButtonActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#111827',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    shadowColor: AppTheme.shadow.color,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
     elevation: 1,
   },
   rangeButtonText: {
-    color: '#6b7280',
+    color: AppTheme.color.textMuted,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   rangeButtonTextActive: {
-    color: '#1f2937',
+    color: AppTheme.color.text,
   },
   trendGrid: {
     marginBottom: 14,
   },
   trendBox: {
     borderWidth: 1,
-    borderColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 10,
-    backgroundColor: '#f9fafb',
+    borderColor: AppTheme.color.line,
+    borderRadius: AppTheme.radius.card,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.30)',
     marginBottom: 10,
   },
   trendLabel: {
     fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
+    color: AppTheme.color.textMuted,
+    fontWeight: '800',
   },
   trendValue: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '900',
     marginTop: 2,
     marginBottom: 8,
   },
@@ -359,21 +367,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   chartAxisText: {
-    color: '#9ca3af',
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  safeZoneText: {
-    color: '#059669',
+    color: AppTheme.color.textSubtle,
     fontSize: 10,
     fontWeight: '800',
+  },
+  safeZoneText: {
+    color: AppTheme.color.primaryDark,
+    fontSize: 10,
+    fontWeight: '900',
   },
   lineChart: {
     height: CHART_HEIGHT,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    borderColor: AppTheme.color.line,
+    borderRadius: AppTheme.radius.input,
+    backgroundColor: 'rgba(255,255,255,0.42)',
     overflow: 'hidden',
     position: 'relative',
   },
@@ -381,11 +389,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: '#dcfce7',
+    backgroundColor: AppTheme.color.primarySoft,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: '#bbf7d0',
-    opacity: 0.72,
+    borderColor: '#bfe8d6',
+    opacity: 0.78,
   },
   chartLine: {
     position: 'absolute',
@@ -399,7 +407,7 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     borderWidth: 2,
-    backgroundColor: '#fff',
+    backgroundColor: AppTheme.color.surface,
   },
   emptyChart: {
     height: CHART_HEIGHT,
@@ -408,38 +416,39 @@ const styles = StyleSheet.create({
   },
   emptyChartText: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: AppTheme.color.textSubtle,
     textAlign: 'center',
   },
   historyTable: {
     borderWidth: 1,
-    borderColor: '#f3f4f6',
-    borderRadius: 12,
+    borderColor: AppTheme.color.line,
+    borderRadius: AppTheme.radius.input,
     overflow: 'hidden',
   },
   historyTableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(255,255,255,0.34)',
     paddingVertical: 8,
   },
   historyTableRow: {
     flexDirection: 'row',
     paddingVertical: 9,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: AppTheme.color.line,
   },
   historyCell: {
     flex: 1,
-    color: '#4b5563',
+    color: AppTheme.color.textMuted,
     fontSize: 12,
     textAlign: 'center',
+    fontWeight: '700',
   },
   historyHeaderCell: {
-    color: '#374151',
-    fontWeight: 'bold',
+    color: AppTheme.color.text,
+    fontWeight: '900',
   },
   historyEmptyText: {
-    color: '#9ca3af',
+    color: AppTheme.color.textSubtle,
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 16,

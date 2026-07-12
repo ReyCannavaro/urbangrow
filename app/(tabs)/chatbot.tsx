@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
@@ -13,11 +12,11 @@ import {
     View,
 } from 'react-native';
 import { apiPost } from '@/constants/api';
+import { AppTheme } from '@/constants/theme';
 
-const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
-const USER_COLOR = '#e0f2fe';
-const BOT_LOADING_COLOR = '#d1d5db';
-const BOT_ACTIVE_COLOR = '#3b82f6';
+const USER_COLOR = AppTheme.color.primaryDark;
+const BOT_LOADING_COLOR = AppTheme.color.neutral;
+const BOT_ACTIVE_COLOR = AppTheme.color.primary;
 
 interface Message {
     id: number | string;
@@ -31,7 +30,14 @@ const initialMessage: Message = {
     sender: 'bot'
 };
 
-const SuggestedQuestions = ['Bagaimana cara menanam yang baik ?', 'Tentang tanaman rumah', 'Apa itu aquaponik?', 'Bagaimana cara mengatur pH air?', 'Bagaimana cara mengendalikan hama?', 'Apa itu hidroponik?'];
+const SuggestedQuestions = [
+    'Cek pH ideal',
+    'Atur suhu air',
+    'Rawat tanaman rumah',
+    'Apa itu aquaponik?',
+    'Kendalikan hama',
+    'Bedanya hidroponik?',
+];
 
 interface ChatResponse {
     reply: string;
@@ -118,19 +124,19 @@ const ChatBubble: React.FC<{ message: Message }> = ({ message }) => {
 
     return (
         <View style={[styles.bubbleContainer, isUser ? styles.userContainer : styles.botContainer]}>
+            {!isUser ? (
+                <View style={styles.botAvatar}>
+                    <Feather name="message-square" size={15} color={AppTheme.color.primaryDark} />
+                </View>
+            ) : null}
             {isUser ? (
                 <View style={[...bubbleStyles, { backgroundColor: USER_COLOR }]}>
                     <Text style={styles.userText}>{message.text}</Text>
                 </View>
             ) : (
-                <LinearGradient
-                    colors={PRIMARY_GRADIENT}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={bubbleStyles}
-                >
+                <View style={bubbleStyles}>
                     <AdvancedMessageParser content={message.text} style={styles.botText} />
-                </LinearGradient>
+                </View>
             )}
         </View>
     );
@@ -200,13 +206,16 @@ const ChatbotPage: React.FC = () => {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
         >
 
-            <LinearGradient
-                colors={PRIMARY_GRADIENT}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.header}>
-                <Text style={styles.headerTitle}>AgriBot</Text>
-            </LinearGradient>
+            <View style={styles.header}>
+                <View style={styles.headerIcon}>
+                    <Feather name="message-circle" size={22} color={AppTheme.color.primarySoft} />
+                </View>
+                <View style={styles.headerCopy}>
+                    <Text style={styles.headerEyebrow}>Assistant</Text>
+                    <Text style={styles.headerTitle}>AgriBot Console</Text>
+                    <Text style={styles.headerSubtitle}>Jawaban praktis untuk air, tanaman, dan perawatan sistem.</Text>
+                </View>
+            </View>
 
             <ScrollView
                 ref={scrollViewRef}
@@ -217,7 +226,11 @@ const ChatbotPage: React.FC = () => {
 
                 {messages.length <= 1 && !isLoading ? (
                     <View style={styles.welcomePromptContainer}>
+                        <View style={styles.welcomeIconWrap}>
+                            <Feather name="message-circle" size={34} color={AppTheme.color.primaryDark} />
+                        </View>
                         <Text style={styles.chatPrompt}>Ada yang bisa saya bantu?</Text>
+                        <Text style={styles.chatPromptSubtitle}>Tanyakan pH, suhu, nutrisi, atau perawatan sistem.</Text>
                     </View>
                 ) : (
                     messages.map(msg => (
@@ -256,8 +269,8 @@ const ChatbotPage: React.FC = () => {
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.textInput}
-                    placeholder={isLoading ? "Menunggu balasan..." : "Tanya FarmBot"}
-                    placeholderTextColor="#a3a3a3"
+                    placeholder={isLoading ? "Menunggu balasan..." : "Tanya AgriBot"}
+                    placeholderTextColor={AppTheme.color.textSubtle}
                     value={inputText}
                     onChangeText={setInputText}
                     multiline={true}
@@ -273,7 +286,7 @@ const ChatbotPage: React.FC = () => {
                     onPress={() => handleSendMessage(inputText)}
                     disabled={!inputText.trim() || isLoading}
                 >
-                    <Feather name="send" size={22} color="#fff" />
+                    <Feather name="send" size={22} color={AppTheme.color.surface} />
                 </Pressable>
             </View>
         </KeyboardAvoidingView>
@@ -285,36 +298,57 @@ export default ChatbotPage;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: AppTheme.color.canvas,
     },
 
     header: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        paddingTop: 20,
+        alignItems: 'flex-start',
+        paddingHorizontal: 18,
+        paddingVertical: 18,
         marginTop: 25,
-        marginHorizontal: 15,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5,
+        marginHorizontal: 16,
+        marginBottom: 6,
+        borderRadius: AppTheme.radius.panel,
+        backgroundColor: AppTheme.color.surfaceStrong,
+    },
+    headerIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(223, 242, 233, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(223, 242, 233, 0.18)',
+        marginRight: 12,
+    },
+    headerCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    headerEyebrow: {
+        color: '#9fc8b7',
+        fontSize: 12,
+        fontWeight: '800',
+        marginBottom: 3,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
-        justifyContent: 'center',
-        alignItems: 'center',
+        fontSize: 25,
+        fontWeight: '900',
+        color: AppTheme.color.surface,
+    },
+    headerSubtitle: {
+        color: '#c7d8d1',
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 4,
+        fontWeight: '600',
     },
 
     chatScrollArea: {
         flex: 1,
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
     },
     chatContent: {
         flexGrow: 1,
@@ -325,17 +359,35 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 24,
+    },
+    welcomeIconWrap: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: AppTheme.color.primarySoft,
+        marginBottom: 14,
     },
     chatPrompt: {
-        fontSize: 24,
-        fontWeight: '600',
-        color: '#4b5563',
+        fontSize: 22,
+        fontWeight: '900',
+        color: AppTheme.color.text,
         textAlign: 'center',
+    },
+    chatPromptSubtitle: {
+        fontSize: 14,
+        lineHeight: 20,
+        color: AppTheme.color.textMuted,
+        textAlign: 'center',
+        marginTop: 6,
     },
 
     bubbleContainer: {
         flexDirection: 'row',
         marginVertical: 6,
+        alignItems: 'flex-end',
     },
     botContainer: {
         justifyContent: 'flex-start',
@@ -347,24 +399,36 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 10,
         maxWidth: '85%',
-        borderRadius: 18,
-        shadowColor: '#000',
+        borderRadius: AppTheme.radius.card,
+        shadowColor: AppTheme.shadow.color,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
-        shadowRadius: 2,
+        shadowRadius: 4,
         elevation: 1,
     },
     botBubble: {
         borderTopLeftRadius: 5,
+        backgroundColor: AppTheme.color.surface,
+        borderWidth: 1,
+        borderColor: AppTheme.color.line,
     },
     userBubble: {
         borderTopRightRadius: 5,
     },
     
     botText: {
-        color: '#fff',
+        color: AppTheme.color.text,
         fontSize: 15,
         lineHeight: 22,
+    },
+    botAvatar: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: AppTheme.color.primarySoft,
+        marginRight: 8,
     },
 
     listItemContainer: {
@@ -378,13 +442,13 @@ const styles = StyleSheet.create({
         fontSize: 15,
         lineHeight: 22,
         fontWeight: 'bold',
-        color: '#fff',
+        color: AppTheme.color.primaryDark,
     },
     listText: {
         flexShrink: 1,
         fontSize: 15,
         lineHeight: 22,
-        color: '#fff',
+        color: AppTheme.color.text,
     },
     headingContainer: {
         marginTop: 8,
@@ -397,8 +461,10 @@ const styles = StyleSheet.create({
     },
 
     userText: {
-        color: '#1f2937',
+        color: AppTheme.color.surface,
         fontSize: 15,
+        lineHeight: 21,
+        fontWeight: '700',
     },
 
     loadingContainer: {
@@ -408,62 +474,65 @@ const styles = StyleSheet.create({
         marginVertical: 6,
         paddingHorizontal: 14,
         paddingVertical: 10,
-        backgroundColor: '#f0f9ff',
-        borderRadius: 18,
-        borderTopLeftRadius: 5,
+        backgroundColor: AppTheme.color.primaryMist,
+        borderRadius: AppTheme.radius.card,
+        borderTopLeftRadius: 6,
         maxWidth: '70%',
     },
     loadingText: {
         marginLeft: 10,
-        color: '#0369a1',
+        color: AppTheme.color.primaryDark,
         fontSize: 15,
-        fontWeight: '500',
+        fontWeight: '700',
     },
 
     suggestedQuestionsWrapper: {
         borderTopWidth: 1,
-        borderTopColor: '#f3f4f6',
+        borderTopColor: AppTheme.color.line,
         paddingVertical: 10,
     },
     suggestedQuestions: {
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
     },
     questionButton: {
         borderWidth: 1,
-        borderColor: '#d1d5db',
-        borderRadius: 25,
+        borderColor: AppTheme.color.lineStrong,
+        borderRadius: AppTheme.radius.pill,
         paddingHorizontal: 16,
         paddingVertical: 8,
         marginRight: 8,
-        backgroundColor: '#f9fafb',
+        backgroundColor: AppTheme.color.surface,
     },
     questionText: {
-        color: '#374151',
-        fontWeight: '500',
+        color: AppTheme.color.text,
+        fontWeight: '700',
         fontSize: 14,
     },
 
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
         paddingVertical: 10,
-        backgroundColor: '#fff',
-        paddingBottom: 15,
+        backgroundColor: AppTheme.color.surface,
+        paddingBottom: 96,
+        borderTopWidth: 1,
+        borderTopColor: AppTheme.color.line,
     },
     textInput: {
         flex: 1,
         minHeight: 45,
         maxHeight: 120,
-        backgroundColor: '#f3f4f6',
+        backgroundColor: AppTheme.color.surfaceMuted,
         borderRadius: 25,
         padding: 10,
         paddingHorizontal: 18,
         fontSize: 16,
         marginRight: 10,
         borderWidth: 1,
-        borderColor: '#e5e7eb',
-        marginBottom: 55,
+        borderColor: AppTheme.color.line,
+        color: AppTheme.color.text,
+        fontWeight: '700',
     },
     sendButton: {
         width: 45,
@@ -471,6 +540,5 @@ const styles = StyleSheet.create({
         borderRadius: 22.5,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 55,
     },
 });

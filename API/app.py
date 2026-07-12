@@ -24,11 +24,15 @@ MAX_PH = 14.0
 MIN_LDR_VALUE = 0
 DEFAULT_DEVICE_ID = os.getenv("URBANGROW_DEFAULT_DEVICE_ID", "esp32-main")
 ESP_HTTP_CONTROL_URL = os.getenv("URBANGROW_ESP_HTTP_CONTROL_URL", "").strip()
+ESP_HTTP_SYNC_URL = os.getenv("URBANGROW_ESP_HTTP_SYNC_URL", "").strip()
 MQTT_COMMAND_TOPIC = os.getenv("URBANGROW_MQTT_COMMAND_TOPIC", "urbangrow/actuator/commands")
+MQTT_SYNC_TOPIC = os.getenv("URBANGROW_MQTT_SYNC_TOPIC", "urbangrow/device/sync")
 API_TOKEN = os.getenv("URBANGROW_API_TOKEN", "").strip()
 MAX_JSON_BODY_BYTES = int(os.getenv("URBANGROW_MAX_JSON_BODY_BYTES", "8192"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("URBANGROW_RATE_LIMIT_WINDOW_SECONDS", "60"))
 RATE_LIMIT_MAX_REQUESTS = int(os.getenv("URBANGROW_RATE_LIMIT_MAX_REQUESTS", "120"))
+SYNC_STALE_MINUTES = int(os.getenv("URBANGROW_SYNC_STALE_MINUTES", "5"))
+SYNC_COOLDOWN_SECONDS = int(os.getenv("URBANGROW_SYNC_COOLDOWN_SECONDS", "120"))
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 AGRIBOT_SYSTEM_PROMPT = (
@@ -50,6 +54,10 @@ TOKEN_PROTECTED_POST_PATHS = {
     "/api/actuator-control",
     "/api/actuator-commands/ack",
     "/api/actuator-command-ack",
+    "/api/sync-device",
+    "/api/device-sync",
+    "/api/sync-device/ack",
+    "/api/device-sync/ack",
     "/api/notifications/clear",
 }
 
@@ -160,6 +168,22 @@ def init_db() -> None:
         )
         db.execute(
             """
+            CREATE TABLE IF NOT EXISTS device_sync_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL,
+                status TEXT NOT NULL CHECK (status IN ('pending', 'syncing', 'success', 'failed', 'skipped')),
+                trigger TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
+                message TEXT,
+                requested_at TEXT NOT NULL,
+                started_at TEXT,
+                completed_at TEXT
+            )
+            """
+        )
+        db.execute(
+            """
             INSERT OR IGNORE INTO actuator_status
                 (id, pumpStatus, lightStatus, updated_at)
             VALUES
@@ -241,6 +265,17 @@ def validate_actuator_ack_fields(data: dict[str, Any]) -> None:
     validate_no_unknown_fields(data, {"command_id", "id", "status", "message"})
     if data.get("command_id") is None and data.get("id") is None:
         raise ValueError("Field wajib belum diisi: command_id.")
+    validate_required_fields(data, {"status"})
+
+
+def validate_sync_request_fields(data: dict[str, Any]) -> None:
+    validate_no_unknown_fields(data, {"device_id", "trigger", "reason", "force"})
+
+
+def validate_sync_ack_fields(data: dict[str, Any]) -> None:
+    validate_no_unknown_fields(data, {"sync_id", "id", "status", "message"})
+    if data.get("sync_id") is None and data.get("id") is None:
+        raise ValueError("Field wajib belum diisi: sync_id.")
     validate_required_fields(data, {"status"})
 
 
@@ -393,6 +428,278 @@ def get_sensor_history(limit: int = 20, hours: int | None = None) -> list[dict[s
         ).fetchall()
 
     return [dict(row) for row in rows]
+
+
+def get_sensor_staleness() -> dict[str, Any]:
+    latest_reading = get_latest_reading()
+    timestamp = latest_reading.get("timestamp")
+    parsed_timestamp = parse_timestamp(timestamp)
+
+    if latest_reading.get("source") == "default" or parsed_timestamp is None:
+        return {
+            "is_stale": True,
+            "minutes_since_update": None,
+            "latest_timestamp": timestamp,
+            "reason": "API belum menerima data sensor asli.",
+        }
+
+    minutes_since_update = int((datetime.now(timezone.utc) - parsed_timestamp).total_seconds() / 60)
+    is_stale = minutes_since_update > SYNC_STALE_MINUTES
+
+    return {
+        "is_stale": is_stale,
+        "minutes_since_update": minutes_since_update,
+        "latest_timestamp": timestamp,
+        "reason": (
+            f"Data sensor terakhir diterima {minutes_since_update} menit lalu."
+            if is_stale
+            else "Data sensor masih update."
+        ),
+    }
+
+
+def sync_payload(sync_log: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "sync_id": sync_log["id"],
+        "device_id": sync_log["device_id"],
+        "action": "reconnect_sensor",
+        "mqtt_topic": MQTT_SYNC_TOPIC,
+        "reason": sync_log["reason"],
+        "requested_at": sync_log["requested_at"],
+    }
+
+
+def row_to_device_sync(row: sqlite3.Row) -> dict[str, Any]:
+    sync_log = dict(row)
+    sync_log["payload"] = sync_payload(sync_log)
+    return sync_log
+
+
+def get_device_sync(sync_id: int) -> dict[str, Any] | None:
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT id, device_id, status, trigger, reason, attempts, message,
+                   requested_at, started_at, completed_at
+            FROM device_sync_logs
+            WHERE id = ?
+            """,
+            (sync_id,),
+        ).fetchone()
+
+    return row_to_device_sync(row) if row is not None else None
+
+
+def get_latest_device_sync(device_id: str | None = None) -> dict[str, Any] | None:
+    params: list[Any] = []
+    where_clause = ""
+
+    if device_id:
+        where_clause = "WHERE device_id = ?"
+        params.append(device_id)
+
+    with get_db() as db:
+        row = db.execute(
+            f"""
+            SELECT id, device_id, status, trigger, reason, attempts, message,
+                   requested_at, started_at, completed_at
+            FROM device_sync_logs
+            {where_clause}
+            ORDER BY requested_at DESC, id DESC
+            LIMIT 1
+            """,
+            params,
+        ).fetchone()
+
+    return row_to_device_sync(row) if row is not None else None
+
+
+def get_sync_status(device_id: str | None = None) -> dict[str, Any]:
+    staleness = get_sensor_staleness()
+    latest_sync = get_latest_device_sync(device_id)
+    status = "idle"
+
+    if latest_sync and latest_sync["status"] in {"pending", "syncing"}:
+        status = latest_sync["status"]
+    elif staleness["is_stale"]:
+        status = "stale"
+    elif latest_sync:
+        status = latest_sync["status"]
+
+    return {
+        "device_id": device_id or DEFAULT_DEVICE_ID,
+        "status": status,
+        "is_stale": staleness["is_stale"],
+        "minutes_since_update": staleness["minutes_since_update"],
+        "latest_sensor_timestamp": staleness["latest_timestamp"],
+        "reason": staleness["reason"],
+        "latest_sync": latest_sync,
+    }
+
+
+def create_device_sync_request(data: dict[str, Any]) -> dict[str, Any]:
+    device_id = str(data.get("device_id") or DEFAULT_DEVICE_ID).strip() or DEFAULT_DEVICE_ID
+    trigger = str(data.get("trigger") or "manual").strip() or "manual"
+    reason = str(data.get("reason") or "Meminta perangkat menyambungkan ulang sensor.").strip()
+    force = bool(data.get("force", False))
+
+    latest_sync = get_latest_device_sync(device_id)
+    if latest_sync and not force:
+        requested_at = parse_timestamp(latest_sync.get("requested_at"))
+        is_recent = requested_at is not None and (
+            datetime.now(timezone.utc) - requested_at
+        ).total_seconds() < SYNC_COOLDOWN_SECONDS
+        if latest_sync["status"] in {"pending", "syncing"} or is_recent:
+            return {**latest_sync, "message": latest_sync.get("message") or "Sync masih dalam cooldown."}
+
+    requested_at = utc_now()
+    status = "pending"
+    delivery_method = "http" if ESP_HTTP_SYNC_URL else "queue"
+    message = f"Sync {delivery_method} dibuat untuk {device_id}."
+
+    with get_db() as db:
+        cursor = db.execute(
+            """
+            INSERT INTO device_sync_logs
+                (device_id, status, trigger, reason, message, requested_at)
+            VALUES
+                (?, ?, ?, ?, ?, ?)
+            """,
+            (device_id, status, trigger, reason, message, requested_at),
+        )
+
+    sync_log = get_device_sync(int(cursor.lastrowid))
+    if sync_log is None:
+        raise RuntimeError("Sync device gagal dibuat.")
+
+    insert_notification(
+        "Sync Perangkat Dimulai",
+        f"Backend meminta {device_id} menyambungkan ulang sensor.",
+        "info",
+        "refresh-cw",
+        requested_at,
+        dedupe_minutes=1,
+    )
+
+    if ESP_HTTP_SYNC_URL:
+        return dispatch_device_sync(sync_log)
+
+    return sync_log
+
+
+def dispatch_device_sync(sync_log: dict[str, Any]) -> dict[str, Any]:
+    payload = sync_payload(sync_log)
+    request_body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        ESP_HTTP_SYNC_URL,
+        data=request_body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with get_db() as db:
+        db.execute(
+            """
+            UPDATE device_sync_logs
+            SET status = 'syncing', attempts = attempts + 1, started_at = ?
+            WHERE id = ?
+            """,
+            (utc_now(), sync_log["id"]),
+        )
+
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            response_text = response.read().decode("utf-8", errors="replace")
+    except (urllib.error.URLError, TimeoutError) as exc:
+        return update_device_sync_status(sync_log["id"], "failed", f"Gagal mengirim HTTP sync ke ESP: {exc}")
+
+    response_status = "success"
+    response_message = "ESP menerima sync request melalui HTTP."
+
+    if response_text.strip():
+        try:
+            response_payload = json.loads(response_text)
+            response_status = str(response_payload.get("status", response_status)).lower()
+            response_message = str(response_payload.get("message", response_message))
+        except json.JSONDecodeError:
+            response_message = response_text.strip()
+
+    if response_status not in {"success", "failed"}:
+        response_status = "success"
+
+    return update_device_sync_status(sync_log["id"], response_status, response_message)
+
+
+def claim_next_device_sync(device_id: str) -> dict[str, Any] | None:
+    device_id = device_id.strip() or DEFAULT_DEVICE_ID
+    started_at = utc_now()
+
+    with get_db() as db:
+        row = db.execute(
+            """
+            SELECT id
+            FROM device_sync_logs
+            WHERE status = 'pending' AND device_id = ?
+            ORDER BY requested_at ASC, id ASC
+            LIMIT 1
+            """,
+            (device_id,),
+        ).fetchone()
+
+        if row is None:
+            return None
+
+        db.execute(
+            """
+            UPDATE device_sync_logs
+            SET status = 'syncing', attempts = attempts + 1, started_at = ?
+            WHERE id = ?
+            """,
+            (started_at, row["id"]),
+        )
+
+    return get_device_sync(int(row["id"]))
+
+
+def update_device_sync_status(sync_id: int, status: str, message: str = "") -> dict[str, Any]:
+    if status not in {"success", "failed", "skipped"}:
+        raise ValueError("Status sync harus success, failed, atau skipped.")
+
+    completed_at = utc_now()
+    with get_db() as db:
+        db.execute(
+            """
+            UPDATE device_sync_logs
+            SET status = ?, message = ?, completed_at = ?
+            WHERE id = ?
+            """,
+            (status, message or None, completed_at, sync_id),
+        )
+
+    sync_log = get_device_sync(sync_id)
+    if sync_log is None:
+        raise ValueError("Sync device tidak ditemukan.")
+
+    if status == "success":
+        insert_notification(
+            "Sync Perangkat Berhasil",
+            f"{sync_log['device_id']} berhasil menjalankan sync sensor.",
+            "info",
+            "check-circle",
+            completed_at,
+            dedupe_minutes=1,
+        )
+    elif status == "failed":
+        insert_notification(
+            "Sync Perangkat Gagal",
+            message or f"{sync_log['device_id']} gagal menjalankan sync sensor.",
+            "warning",
+            "wifi-off",
+            completed_at,
+            dedupe_minutes=1,
+        )
+
+    return sync_log
 
 
 def get_actuator_status() -> dict[str, Any]:
@@ -1225,6 +1532,17 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
             self.send_json(200, list_actuator_logs(limit))
             return
 
+        if path in {"/api/sync-status", "/api/device-sync/status"}:
+            device_id = query.get("device_id", [DEFAULT_DEVICE_ID])[0]
+            self.send_json(200, get_sync_status(device_id))
+            return
+
+        if path in {"/api/sync-device/next", "/api/device-sync/next"}:
+            device_id = query.get("device_id", [DEFAULT_DEVICE_ID])[0]
+            sync_log = claim_next_device_sync(device_id)
+            self.send_json(200, {"sync": sync_log})
+            return
+
         if path == "/api/notifications":
             try:
                 limit = int(query.get("limit", ["50"])[0])
@@ -1303,6 +1621,48 @@ class UrbanGrowHandler(BaseHTTPRequestHandler):
                     "message": "Ack command aktuator diterima.",
                     "command": command,
                     "actuator": get_actuator_status(),
+                },
+            )
+            return
+
+        if path in {"/api/sync-device", "/api/device-sync"}:
+            try:
+                validate_sync_request_fields(payload)
+                sync_log = create_device_sync_request(payload)
+            except ValueError as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+            except RuntimeError as exc:
+                self.send_json(500, {"error": str(exc)})
+                return
+
+            self.send_json(
+                202 if sync_log["status"] in {"pending", "syncing"} else 200,
+                {
+                    "message": "Sync perangkat dibuat.",
+                    "sync": sync_log,
+                    "sync_status": get_sync_status(sync_log["device_id"]),
+                },
+            )
+            return
+
+        if path in {"/api/sync-device/ack", "/api/device-sync/ack"}:
+            try:
+                validate_sync_ack_fields(payload)
+                sync_id = int(payload.get("sync_id", payload.get("id")))
+                status = str(payload.get("status", "")).lower()
+                message = str(payload.get("message", "")).strip()
+                sync_log = update_device_sync_status(sync_id, status, message)
+            except (TypeError, ValueError) as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+
+            self.send_json(
+                200,
+                {
+                    "message": "Ack sync perangkat diterima.",
+                    "sync": sync_log,
+                    "sync_status": get_sync_status(sync_log["device_id"]),
                 },
             )
             return

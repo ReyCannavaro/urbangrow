@@ -1,17 +1,20 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { AntDesign, Feather, FontAwesome5 } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import { AppTheme } from '@/constants/theme';
 
 const getIcon = (name: string, color: string) => {
+  const iconSize = 24;
+
   switch (name) {
     case 'home':
-      return <Feather name="home" size={30} color={color} />;
+      return <Feather name="home" size={iconSize} color={color} />;
     case 'chatbot':
-      return <FontAwesome5 name="robot" size={30} color={color} />;
+      return <Feather name="message-circle" size={iconSize} color={color} />;
     case 'control':
-      return <AntDesign name="setting" size={30} color={color} />;
+      return <Feather name="sliders" size={iconSize} color={color} />;
     case 'notifications':
-      return <Feather name="bell" size={30} color={color} />;
+      return <Feather name="bell" size={iconSize} color={color} />;
     default:
       return null;
   }
@@ -23,8 +26,8 @@ interface StaticTabBarIconProps {
 }
 
 export function StaticTabBarIcon({ name, focused }: StaticTabBarIconProps) {
-  const activeColor = name === 'chatbot' ? '#6366f1' : '#1f2937';
-  const inactiveColor = '#94a3b8';
+  const activeColor = AppTheme.color.surfaceStrong;
+  const inactiveColor = '#9fb1a8';
 
   const iconWrapperStyle = focused ? styles.iconWrapperActive : styles.iconWrapperInactive;
 
@@ -33,9 +36,7 @@ export function StaticTabBarIcon({ name, focused }: StaticTabBarIconProps) {
       <View style={[styles.iconWrapperBase, iconWrapperStyle]}>
         {getIcon(
             name,
-            focused
-              ? (name === 'chatbot' ? '#6366f1' : activeColor)
-              : inactiveColor
+            focused ? activeColor : inactiveColor
         )}
       </View>
     </View>
@@ -47,17 +48,16 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: -50,
   },
   iconWrapperBase: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+    width: 38,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapperActive: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: AppTheme.color.primarySoft,
   },
   iconWrapperInactive: {
     backgroundColor: 'transparent',

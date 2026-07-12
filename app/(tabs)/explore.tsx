@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
@@ -19,13 +18,19 @@ import {
     ActuatorStatus,
     apiGet,
     apiPost,
+    DeviceSyncResponse,
+    DeviceSyncStatus,
     normalizeActuatorStatus,
 } from '@/constants/api';
+import { AppTheme } from '@/constants/theme';
+import { GlassBackground } from '@/components/ui/GlassBackground';
+import { GlassPanel } from '@/components/ui/GlassPanel';
 
-const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
-const COLOR_BLUE = '#60a5fa';
-const COLOR_YELLOW = '#facc15';
-const COLOR_ORANGE = '#f97316';
+const COLOR_BLUE = AppTheme.color.info;
+const COLOR_YELLOW = AppTheme.color.warning;
+const COLOR_ORANGE = '#d66a24';
+const COLOR_SUCCESS = AppTheme.color.primary;
+const COLOR_DANGER = AppTheme.color.danger;
 
 interface ControlItem {
     id: 'pompa' | 'lampu';
@@ -63,16 +68,16 @@ interface SensorPreset {
 }
 
 const recommendationData: RecommendationItem[] = [
-    { id: 1, text: 'Kondisi optimal untuk pertumbuhan sayur', icon: 'check-circle', color: '#10b981' },
-    { id: 2, text: 'Pertimbangkan panen kangkung minggu ini', icon: 'alert-triangle', color: '#facc15' },
-    { id: 3, text: 'Berapa Ph air dengan kualitas terbaik', icon: 'droplet', color: '#3b82f6' },
+    { id: 1, text: 'Kondisi optimal untuk pertumbuhan sayur', icon: 'check-circle', color: AppTheme.color.primary },
+    { id: 2, text: 'Pertimbangkan panen kangkung minggu ini', icon: 'alert-triangle', color: AppTheme.color.warning },
+    { id: 3, text: 'Berapa pH air dengan kualitas terbaik', icon: 'droplet', color: AppTheme.color.info },
 ];
 
 const sensorPresets: SensorPreset[] = [
-    { id: 'normal', label: 'Normal', temperature: 26.8, ph: 6.8, ldrValue: 460, color: '#10b981' },
-    { id: 'ph-low', label: 'pH Rendah', temperature: 26.4, ph: 5.6, ldrValue: 430, color: '#ef4444' },
-    { id: 'hot', label: 'Suhu Tinggi', temperature: 31.2, ph: 7.1, ldrValue: 410, color: '#f97316' },
-    { id: 'low-light', label: 'Cahaya Rendah', temperature: 25.9, ph: 6.9, ldrValue: 180, color: '#facc15' },
+    { id: 'normal', label: 'Normal', temperature: 26.8, ph: 6.8, ldrValue: 460, color: AppTheme.color.primary },
+    { id: 'ph-low', label: 'pH Rendah', temperature: 26.4, ph: 5.6, ldrValue: 430, color: AppTheme.color.danger },
+    { id: 'hot', label: 'Suhu Tinggi', temperature: 31.2, ph: 7.1, ldrValue: 410, color: '#d66a24' },
+    { id: 'low-light', label: 'Cahaya Rendah', temperature: 25.9, ph: 6.9, ldrValue: 180, color: AppTheme.color.warning },
 ];
 
 const getCommandStatusCopy = (command: ActuatorCommand) => {
@@ -92,14 +97,14 @@ const getCommandStatusCopy = (command: ActuatorCommand) => {
 
 const getCommandStatusColor = (status: ActuatorCommand['status']) => {
     if (status === 'success') {
-        return '#059669';
+        return COLOR_SUCCESS;
     }
 
     if (status === 'failed') {
-        return '#dc2626';
+        return COLOR_DANGER;
     }
 
-    return '#d97706';
+        return AppTheme.color.warning;
 };
 
 interface MainControlCardProps extends ControlItem {
@@ -110,36 +115,38 @@ interface MainControlCardProps extends ControlItem {
 
 const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, isDisabled, isOn, onToggle, ...item }) => {
     const cardStyle = {
-        backgroundColor: isOn ? color + '20' : '#fefefe', 
-        borderColor: isOn ? color : '#cbd5e1',
+        borderColor: isOn ? color : AppTheme.color.line,
     };
 
-    const iconColor = isOn ? color : '#6b7280';
-    const statusBgColor = isOn ? color : '#ef4444';
+    const iconColor = isOn ? color : AppTheme.color.textMuted;
+    const statusBgColor = isOn ? AppTheme.color.primarySoft : AppTheme.color.neutralSoft;
+    const statusTextColor = isOn ? AppTheme.color.primaryDark : AppTheme.color.textMuted;
 
     return (
         <Pressable 
             style={({ pressed }) => [
-                styles.mainControlCard, 
-                cardStyle,
+                styles.mainControlPressable,
                 { opacity: isDisabled ? 0.55 : pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] }
             ]}
             onPress={() => onToggle({ ...item, title, icon, color }, isOn ? 'OFF' : 'ON')}
             disabled={isDisabled}
         >
-            <Feather 
-                name={icon} 
-                size={40} 
-                color={iconColor} 
-                style={styles.controlIcon} 
-            />
-            <Text style={styles.controlTitleText}>{title}</Text>
-            
-            <View style={[styles.controlStatusButton, { backgroundColor: statusBgColor }]}>
-                <Text style={styles.controlStatusText}>
-                    {isOn ? 'ON' : 'OFF'}
-                </Text>
-            </View>
+            <GlassPanel style={[styles.mainControlCard, cardStyle]} contentStyle={styles.mainControlContent} intensity={58} variant="strong">
+                <View style={[styles.controlIconShell, { backgroundColor: isOn ? `${color}18` : AppTheme.color.neutralSoft }]}>
+                    <Feather
+                        name={icon}
+                        size={30}
+                        color={iconColor}
+                    />
+                </View>
+                <Text style={styles.controlTitleText}>{title}</Text>
+                
+                <View style={[styles.controlStatusButton, { backgroundColor: statusBgColor, borderColor: isOn ? color : AppTheme.color.lineStrong }]}>
+                    <Text style={[styles.controlStatusText, { color: statusTextColor }]}>
+                        {isOn ? 'ON' : 'OFF'}
+                    </Text>
+                </View>
+            </GlassPanel>
         </Pressable>
     );
 };
@@ -150,23 +157,47 @@ interface ActionCardProps {
     icon: keyof typeof Feather.glyphMap;
     actionColor: string;
     onPerformAction: () => void;
+    isDisabled?: boolean;
+    isLoading?: boolean;
 }
 
-const ActionPressable: React.FC<ActionCardProps> = ({ title, subtitle, icon, actionColor, onPerformAction }) => {
+const ActionPressable: React.FC<ActionCardProps> = ({
+    title,
+    subtitle,
+    icon,
+    actionColor,
+    onPerformAction,
+    isDisabled = false,
+    isLoading = false,
+}) => {
     return (
         <Pressable
             style={({ pressed }) => [
-                styles.actionCard,
-                { backgroundColor: actionColor, 
-                  opacity: pressed ? 0.7 : 1,
+                styles.actionPressable,
+                {
+                  opacity: isDisabled ? 0.58 : pressed ? 0.7 : 1,
                   transform: [{ scale: pressed ? 0.95 : 1 }],
                 }
             ]}
             onPress={onPerformAction}
+            disabled={isDisabled}
         >
-            <Feather name={icon} size={30} color="#fff" />
-            <Text style={styles.actionTitle}>{title}</Text>
-            <Text style={styles.actionSubtitle}>{subtitle}</Text>
+            <GlassPanel
+                style={[styles.actionCard, { borderColor: `${actionColor}55` }]}
+                contentStyle={styles.actionContent}
+                intensity={58}
+                variant="strong"
+            >
+                <View style={[styles.actionIconShell, { backgroundColor: `${actionColor}18` }]}>
+                {isLoading ? (
+                    <ActivityIndicator size="small" color={actionColor} />
+                ) : (
+                    <Feather name={icon} size={24} color={actionColor} />
+                )}
+                </View>
+                <Text style={styles.actionTitle}>{title}</Text>
+                <Text style={styles.actionSubtitle}>{subtitle}</Text>
+            </GlassPanel>
         </Pressable>
     );
 };
@@ -174,14 +205,14 @@ const ActionPressable: React.FC<ActionCardProps> = ({ title, subtitle, icon, act
 const RecommendationCard: React.FC<{ item: RecommendationItem }> = ({ item }) => {
     return (
         <Pressable 
-            style={({ pressed }) => [styles.recommendationCard, { backgroundColor: pressed ? '#f3f4f6' : '#fff' }]}
+            style={({ pressed }) => [styles.recommendationCard, { backgroundColor: pressed ? AppTheme.color.surfaceMuted : 'transparent' }]}
             onPress={() => Alert.alert('Rekomendasi', item.text)}
         >
-            <View style={[styles.recommendationIconWrapper, { borderColor: item.color }]}>
+            <View style={[styles.recommendationIconWrapper, { backgroundColor: `${item.color}18`, borderColor: `${item.color}40` }]}>
                 <Feather name={item.icon} size={20} color={item.color} />
             </View>
             <Text style={styles.recommendationText}>{item.text}</Text>
-            <Feather name="chevron-right" size={20} color="#9ca3af" />
+            <Feather name="chevron-right" size={20} color={AppTheme.color.textSubtle} />
         </Pressable>
     );
 };
@@ -195,6 +226,9 @@ const ExplorePage: React.FC = () => {
     const [activeControl, setActiveControl] = useState<ActuatorKey | null>(null);
     const [latestActuatorCommand, setLatestActuatorCommand] = useState<ActuatorCommand | null>(null);
     const [commandStatusMessage, setCommandStatusMessage] = useState('');
+    const [syncStatus, setSyncStatus] = useState<DeviceSyncStatus | null>(null);
+    const [isSyncingDevice, setIsSyncingDevice] = useState(false);
+    const [syncMessage, setSyncMessage] = useState('');
     const [controlError, setControlError] = useState('');
     const [manualSensorForm, setManualSensorForm] = useState<ManualSensorForm>({
         temperature: '26.8',
@@ -227,10 +261,20 @@ const ExplorePage: React.FC = () => {
         }
     }, []);
 
+    const fetchSyncStatus = useCallback(async () => {
+        try {
+            const status = await apiGet<DeviceSyncStatus>('/api/sync-status');
+            setSyncStatus(status);
+        } catch (error) {
+            console.warn('Failed to load sync status:', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchActuatorStatus();
         fetchLatestActuatorCommand();
-    }, [fetchActuatorStatus, fetchLatestActuatorCommand]);
+        fetchSyncStatus();
+    }, [fetchActuatorStatus, fetchLatestActuatorCommand, fetchSyncStatus]);
 
     const handleActuatorToggle = async (item: ControlItem, nextValue: 'ON' | 'OFF') => {
         setActiveControl(item.actuatorKey);
@@ -265,6 +309,35 @@ const ExplorePage: React.FC = () => {
 
     const handleFeedAction = () => {
         Alert.alert('Aksi Pakan', 'Pakan ikan telah dikeluarkan sekarang.');
+    };
+
+    const handleDeviceSync = async () => {
+        setIsSyncingDevice(true);
+        setSyncMessage('');
+
+        try {
+            const response = await apiPost<DeviceSyncResponse>('/api/sync-device', {
+                trigger: 'manual',
+                reason: 'User meminta perangkat menyambungkan ulang sensor dari aplikasi.',
+                force: true,
+            });
+            setSyncStatus(response.sync_status);
+            setSyncMessage(response.sync.message || 'Sync perangkat berhasil dikirim.');
+
+            if (response.sync.status === 'pending' || response.sync.status === 'syncing') {
+                Alert.alert('Sync Alat', 'Permintaan sync masuk antrean dan menunggu respons ESP.');
+            } else if (response.sync.status === 'failed') {
+                Alert.alert('Sync Gagal', response.sync.message || 'Perangkat belum merespons sync.');
+            } else {
+                Alert.alert('Sync Alat', response.sync.message || 'Perangkat berhasil menjalankan sync.');
+            }
+        } catch (error) {
+            console.warn('Failed to request device sync:', error);
+            setSyncMessage('Gagal meminta sync perangkat. Pastikan API sedang berjalan.');
+            Alert.alert('Sync Gagal', 'Permintaan sync belum terkirim ke API.');
+        } finally {
+            setIsSyncingDevice(false);
+        }
     };
 
     const setSensorField = (field: keyof ManualSensorForm, value: string) => {
@@ -327,18 +400,41 @@ const ExplorePage: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+            <GlassBackground />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 116 }}>
 
-                <LinearGradient
-                    colors={PRIMARY_GRADIENT}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.header}>
-                    <Text style={styles.headerTitle}>Kontrol Sistem UrbanFarm</Text>
-                </LinearGradient>
+                <GlassPanel style={styles.header} contentStyle={styles.headerInner} intensity={72} variant="strong">
+                    <View style={styles.headerTop}>
+                        <View style={styles.headerIcon}>
+                            <Feather name="sliders" size={22} color={AppTheme.color.primaryDark} />
+                        </View>
+                        <View style={styles.headerCopy}>
+                            <Text style={styles.headerEyebrow}>Control Center</Text>
+                            <Text style={styles.headerTitle}>Kontrol Sistem</Text>
+                            <Text style={styles.headerSubtitle}>Kirim perintah, sync alat, dan input sensor manual.</Text>
+                        </View>
+                    </View>
+                    <View style={styles.headerMetaRow}>
+                        <View style={styles.headerMetaItem}>
+                            <Text style={styles.headerMetaLabel}>Pompa</Text>
+                            <Text style={styles.headerMetaValue}>{actuatorStatus.pumpStatus}</Text>
+                        </View>
+                        <View style={styles.headerMetaItem}>
+                            <Text style={styles.headerMetaLabel}>Lampu</Text>
+                            <Text style={styles.headerMetaValue}>{actuatorStatus.lightStatus}</Text>
+                        </View>
+                        <View style={styles.headerMetaItem}>
+                            <Text style={styles.headerMetaLabel}>Sync</Text>
+                            <Text style={styles.headerMetaValue}>{syncStatus?.status ?? 'cek'}</Text>
+                        </View>
+                    </View>
+                </GlassPanel>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Kontrol Perangkat</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Kontrol Perangkat</Text>
+                        <Text style={styles.sectionSubtitle}>Perintah masuk antrean dan menunggu ack ESP.</Text>
+                    </View>
                     {controlError ? <Text style={styles.errorText}>{controlError}</Text> : null}
                     <View style={styles.mainControlsRow}>
                         {controlItems.map(item => (
@@ -353,16 +449,19 @@ const ExplorePage: React.FC = () => {
                     </View>
                     {isActuatorLoading ? (
                         <View style={styles.loadingRow}>
-                            <ActivityIndicator size="small" color="#3b82f6" />
+                            <ActivityIndicator size="small" color={AppTheme.color.primary} />
                             <Text style={styles.loadingText}>Memuat status perangkat...</Text>
                         </View>
                     ) : null}
                     {latestActuatorCommand ? (
-                        <View
+                        <GlassPanel
                             style={[
                                 styles.commandStatusCard,
                                 { borderColor: getCommandStatusColor(latestActuatorCommand.status) },
                             ]}
+                            contentStyle={styles.commandStatusContent}
+                            intensity={58}
+                            variant="strong"
                         >
                             <View style={styles.commandStatusHeader}>
                                 <Text
@@ -383,13 +482,16 @@ const ExplorePage: React.FC = () => {
                             <Text style={styles.commandStatusHint}>
                                 Device: {latestActuatorCommand.device_id} | Attempts: {latestActuatorCommand.attempts}
                             </Text>
-                        </View>
+                        </GlassPanel>
                     ) : null}
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Input Sensor Manual</Text>
-                    <View style={styles.manualSensorCard}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Input Sensor Manual</Text>
+                        <Text style={styles.sectionSubtitle}>Untuk simulasi, kalibrasi, atau pengujian API.</Text>
+                    </View>
+                    <GlassPanel style={styles.manualSensorCard} contentStyle={styles.manualSensorContent} intensity={60} variant="strong">
                         <View style={styles.manualInputRow}>
                             <View style={styles.manualInputGroup}>
                                 <Text style={styles.manualInputLabel}>Suhu</Text>
@@ -399,7 +501,7 @@ const ExplorePage: React.FC = () => {
                                     onChangeText={value => setSensorField('temperature', value)}
                                     keyboardType="decimal-pad"
                                     placeholder="26.8"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor={AppTheme.color.textSubtle}
                                 />
                             </View>
                             <View style={styles.manualInputGroup}>
@@ -410,7 +512,7 @@ const ExplorePage: React.FC = () => {
                                     onChangeText={value => setSensorField('ph', value)}
                                     keyboardType="decimal-pad"
                                     placeholder="6.8"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor={AppTheme.color.textSubtle}
                                 />
                             </View>
                             <View style={styles.manualInputGroup}>
@@ -421,7 +523,7 @@ const ExplorePage: React.FC = () => {
                                     onChangeText={value => setSensorField('ldrValue', value)}
                                     keyboardType="number-pad"
                                     placeholder="460"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor={AppTheme.color.textSubtle}
                                 />
                             </View>
                         </View>
@@ -453,19 +555,22 @@ const ExplorePage: React.FC = () => {
                             disabled={isSensorSubmitting}
                         >
                             {isSensorSubmitting ? (
-                                <ActivityIndicator size="small" color="#fff" />
+                                <ActivityIndicator size="small" color={AppTheme.color.surface} />
                             ) : (
-                                <Feather name="upload-cloud" size={20} color="#fff" />
+                                <Feather name="upload-cloud" size={20} color={AppTheme.color.surface} />
                             )}
                             <Text style={styles.submitSensorButtonText}>
                                 {isSensorSubmitting ? 'Mengirim...' : 'Kirim Data Sensor'}
                             </Text>
                         </Pressable>
-                    </View>
+                    </GlassPanel>
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+                        <Text style={styles.sectionSubtitle}>Operasi sekali tekan untuk feeder dan reconnect.</Text>
+                    </View>
                     <View style={styles.actionGrid}>
                         <ActionPressable 
                             title="Beri Pakan" 
@@ -474,17 +579,63 @@ const ExplorePage: React.FC = () => {
                             actionColor={COLOR_ORANGE}
                             onPerformAction={handleFeedAction}
                         />
+                        <ActionPressable
+                            title="Sync Alat"
+                            subtitle={isSyncingDevice ? 'Mengirim' : 'Reconnect'}
+                            icon="refresh-cw"
+                            actionColor={COLOR_BLUE}
+                            onPerformAction={handleDeviceSync}
+                            isDisabled={isSyncingDevice}
+                            isLoading={isSyncingDevice}
+                        />
                     </View>
+                    {syncStatus ? (
+                        <GlassPanel
+                            style={[
+                                styles.syncStatusCard,
+                                { borderColor: getCommandStatusColor(syncStatus.status === 'stale' ? 'failed' : syncStatus.status === 'success' ? 'success' : 'pending') },
+                            ]}
+                            contentStyle={styles.commandStatusContent}
+                            intensity={58}
+                            variant="strong"
+                        >
+                            <View style={styles.commandStatusHeader}>
+                                <Text style={styles.commandStatusMeta}>Sync System</Text>
+                                <Text
+                                    style={[
+                                        styles.commandStatusBadge,
+                                        {
+                                            color: getCommandStatusColor(
+                                                syncStatus.status === 'stale'
+                                                    ? 'failed'
+                                                    : syncStatus.status === 'success'
+                                                        ? 'success'
+                                                        : 'pending',
+                                            ),
+                                        },
+                                    ]}
+                                >
+                                    {syncStatus.status.toUpperCase()}
+                                </Text>
+                            </View>
+                            <Text style={styles.commandStatusText}>
+                                {syncMessage || syncStatus.reason}
+                            </Text>
+                            <Text style={styles.commandStatusHint}>
+                                Update sensor: {syncStatus.minutes_since_update ?? '-'} menit lalu
+                            </Text>
+                        </GlassPanel>
+                    ) : null}
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Mode Otomatis</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Mode Otomatis</Text>
+                    </View>
                     <Pressable
                         style={({ pressed }) => [
-                            styles.feederCard,
-                            { 
-                                backgroundColor: isFeederActive ? '#10b98120' : '#fefefe', 
-                                borderColor: isFeederActive ? '#10b981' : '#cbd5e1',
+                            styles.feederPressable,
+                            {
                                 opacity: pressed ? 0.95 : 1,
                             }
                         ]}
@@ -493,30 +644,53 @@ const ExplorePage: React.FC = () => {
                             Alert.alert('Feeder Otomatis', `Feeder Otomatis telah ${!isFeederActive ? 'diaktifkan' : 'dimatikan'}.`);
                         }}
                     >
-                        <View style={styles.controlInfo}>
-                            <Feather name="clock" size={24} color={isFeederActive ? '#10b981' : '#6b7280'} />
-                            <Text style={[styles.feederTitle, { color: isFeederActive ? '#10b981' : '#1f2937' }]}>
-                                Feeder Otomatis
-                            </Text>
-                        </View>
-                        <View style={[styles.controlStatusButton, { backgroundColor: isFeederActive ? '#10b981' : '#ef4444' }]}>
-                            <Text style={styles.controlStatusText}>
-                                {isFeederActive ? 'ACTIVE' : 'INACTIVE'}
-                            </Text>
-                        </View>
+                        <GlassPanel
+                            style={[
+                                styles.feederCard,
+                                { borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.line },
+                            ]}
+                            contentStyle={styles.feederContent}
+                            intensity={58}
+                            variant="strong"
+                        >
+                            <View style={styles.controlInfo}>
+                                <Feather name="clock" size={24} color={isFeederActive ? AppTheme.color.primary : AppTheme.color.textMuted} />
+                                <Text style={[styles.feederTitle, { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.text }]}>
+                                    Feeder Otomatis
+                                </Text>
+                            </View>
+                            <View
+                                style={[
+                                    styles.controlStatusButton,
+                                    {
+                                        backgroundColor: isFeederActive ? AppTheme.color.primarySoft : AppTheme.color.neutralSoft,
+                                        borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.lineStrong,
+                                    },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.controlStatusText,
+                                        { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.textMuted },
+                                    ]}
+                                >
+                                    {isFeederActive ? 'ACTIVE' : 'INACTIVE'}
+                                </Text>
+                            </View>
+                        </GlassPanel>
                     </Pressable>
                 </View>
 
                 <View style={styles.section}>
                     <View style={styles.recommendationHeader}>
-                        <Feather name="trending-up" size={20} color="#10b981" />
+                        <Feather name="trending-up" size={20} color={AppTheme.color.primary} />
                         <Text style={styles.recommendationTitle}>Rekomendasi AI</Text>
                     </View>
-                    <View style={styles.recommendationList}>
+                    <GlassPanel style={styles.recommendationList} contentStyle={styles.recommendationContent} intensity={58} variant="strong">
                         {recommendationData.map(item => (
                             <RecommendationCard key={item.id} item={item} />
                         ))}
-                    </View>
+                    </GlassPanel>
                 </View>
 
             </ScrollView>
@@ -529,53 +703,134 @@ export default ExplorePage;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: AppTheme.color.canvas,
     },
 
     header: {
-        paddingTop: 20,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: 'space-between',
+        alignItems: 'stretch',
         marginTop: 25,
-        marginBottom: 10,
-        marginHorizontal: 15,
-        borderRadius: 20,
+        marginBottom: 14,
+        marginHorizontal: 16,
+        borderRadius: AppTheme.radius.panel,
+        minHeight: 166,
+    },
+    headerInner: {
+        padding: 18,
+        minHeight: 166,
+        justifyContent: 'space-between',
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    headerIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: AppTheme.color.primarySoft,
+        borderWidth: 1,
+        borderColor: AppTheme.color.lineStrong,
+        marginRight: 12,
+    },
+    headerCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    headerEyebrow: {
+        color: AppTheme.color.textMuted,
+        fontSize: 12,
+        fontWeight: '800',
+        marginBottom: 3,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
+        fontSize: 26,
+        fontWeight: '900',
+        color: AppTheme.color.text,
+    },
+    headerSubtitle: {
+        color: AppTheme.color.textMuted,
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 4,
+        fontWeight: '600',
+    },
+    headerMetaRow: {
+        flexDirection: 'row',
+        marginTop: 18,
+    },
+    headerMetaItem: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: AppTheme.color.line,
+        backgroundColor: 'rgba(255,255,255,0.30)',
+        borderRadius: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginRight: 8,
+    },
+    headerMetaLabel: {
+        color: AppTheme.color.textMuted,
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    headerMetaValue: {
+        color: AppTheme.color.text,
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 2,
     },
 
     section: {
-        paddingHorizontal: 15,
-        marginTop: 20,
+        paddingHorizontal: 16,
+        marginTop: 18,
+    },
+    sectionHeader: {
+        marginBottom: 12,
     },
     sectionTitle: {
         fontSize: 18,
+        fontWeight: '900',
+        color: AppTheme.color.textOnGlass,
+    },
+    sectionSubtitle: {
+        color: AppTheme.color.textOnGlassMuted,
+        fontSize: 12,
+        lineHeight: 18,
         fontWeight: '700',
-        color: '#1f2937',
-        marginBottom: 10,
+        marginTop: 3,
     },
 
     mainControlsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 15,
+        marginBottom: 12,
     },
     errorText: {
-        color: '#dc2626',
+        color: COLOR_DANGER,
         fontSize: 13,
         lineHeight: 18,
         marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#f4b7ae',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.dangerSoft,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
     },
     successText: {
-        color: '#059669',
+        color: AppTheme.color.primaryDark,
         fontSize: 13,
         lineHeight: 18,
         marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#bfe8d6',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.primaryMist,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
     },
     loadingRow: {
         flexDirection: 'row',
@@ -585,18 +840,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: 5,
     },
     loadingText: {
-        color: '#4b5563',
+        color: AppTheme.color.textOnGlassMuted,
         fontSize: 13,
-        fontWeight: '500',
+        fontWeight: '700',
         marginLeft: 8,
     },
     commandStatusCard: {
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderRadius: 14,
-        padding: 12,
-        marginHorizontal: 5,
+        borderRadius: AppTheme.radius.card,
+        marginHorizontal: 0,
         marginBottom: 12,
+    },
+    commandStatusContent: {
+        padding: 12,
+    },
+    syncStatusCard: {
+        borderRadius: AppTheme.radius.card,
+        marginHorizontal: 0,
+        marginTop: 2,
+        marginBottom: 8,
     },
     commandStatusHeader: {
         flexDirection: 'row',
@@ -606,60 +867,68 @@ const styles = StyleSheet.create({
     },
     commandStatusBadge: {
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '900',
     },
     commandStatusMeta: {
-        color: '#6b7280',
+        color: AppTheme.color.textSubtle,
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '800',
     },
     commandStatusText: {
-        color: '#1f2937',
+        color: AppTheme.color.text,
         fontSize: 13,
         lineHeight: 18,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     commandStatusHint: {
-        color: '#6b7280',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
         lineHeight: 16,
         marginTop: 4,
     },
-    mainControlCard: {
+    mainControlPressable: {
         flex: 1,
-        height: 150,
-        borderRadius: 20,
-        padding: 15,
+        marginHorizontal: 5,
+    },
+    mainControlCard: {
+        borderRadius: AppTheme.radius.card,
+    },
+    mainControlContent: {
+        minHeight: 148,
+        padding: 14,
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginHorizontal: 5,
-        borderWidth: 2,
     },
-    controlIcon: {
-        marginTop: 10,
+    controlIconShell: {
+        width: 54,
+        height: 54,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
     },
     controlTitleText: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#374151',
+        fontWeight: '800',
+        color: AppTheme.color.text,
+        marginTop: 10,
     },
     controlStatusButton: {
         paddingHorizontal: 15,
-        paddingVertical: 4,
-        borderRadius: 20,
+        paddingVertical: 5,
+        borderRadius: AppTheme.radius.pill,
+        borderWidth: 1,
         marginTop: 8,
     },
     controlStatusText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 14,
+        fontWeight: '900',
+        fontSize: 13,
     },
 
     manualSensorCard: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        borderRadius: 16,
+        borderRadius: AppTheme.radius.panel,
+    },
+    manualSensorContent: {
         padding: 14,
     },
     manualInputRow: {
@@ -671,21 +940,21 @@ const styles = StyleSheet.create({
         width: '31.5%',
     },
     manualInputLabel: {
-        color: '#4b5563',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: '800',
         marginBottom: 6,
     },
     manualInput: {
         minHeight: 44,
         borderWidth: 1,
-        borderColor: '#d1d5db',
-        borderRadius: 12,
+        borderColor: AppTheme.color.lineStrong,
+        borderRadius: AppTheme.radius.input,
         paddingHorizontal: 10,
-        backgroundColor: '#f9fafb',
-        color: '#1f2937',
+        backgroundColor: AppTheme.color.surfaceMuted,
+        color: AppTheme.color.text,
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '800',
     },
     presetGrid: {
         flexDirection: 'row',
@@ -695,12 +964,12 @@ const styles = StyleSheet.create({
     },
     presetButton: {
         width: '48.5%',
-        borderWidth: 1.5,
-        borderRadius: 12,
+        borderWidth: 1,
+        borderRadius: AppTheme.radius.input,
         paddingVertical: 9,
         paddingHorizontal: 10,
         marginBottom: 8,
-        backgroundColor: '#fff',
+        backgroundColor: 'rgba(255,255,255,0.56)',
         alignItems: 'center',
     },
     presetButtonText: {
@@ -709,14 +978,14 @@ const styles = StyleSheet.create({
     },
     submitSensorButton: {
         minHeight: 46,
-        borderRadius: 14,
-        backgroundColor: '#3b82f6',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.primary,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
     },
     submitSensorButtonText: {
-        color: '#fff',
+        color: AppTheme.color.surface,
         fontSize: 15,
         fontWeight: '700',
         marginLeft: 8,
@@ -727,37 +996,49 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
-    actionCard: {
+    actionPressable: {
         flex: 1,
-        alignItems: 'center',
-        paddingVertical: 20,
         marginHorizontal: 5,
-        borderRadius: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 3,
+    },
+    actionCard: {
+        borderRadius: AppTheme.radius.card,
+    },
+    actionContent: {
+        alignItems: 'flex-start',
+        padding: 14,
+        minHeight: 130,
+    },
+    actionIconShell: {
+        width: 42,
+        height: 42,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
     actionTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginTop: 8,
+        fontWeight: '900',
+        color: AppTheme.color.text,
     },
     actionSubtitle: {
         fontSize: 12,
-        color: '#fff',
-        opacity: 0.8,
+        color: AppTheme.color.textMuted,
+        fontWeight: '700',
+        marginTop: 3,
     },
 
+    feederPressable: {
+        width: '100%',
+    },
     feederCard: {
+        borderRadius: AppTheme.radius.panel,
+    },
+    feederContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
-        borderRadius: 20,
-        borderWidth: 2,
+        padding: 16,
     },
     controlInfo: {
         flexDirection: 'row',
@@ -765,7 +1046,7 @@ const styles = StyleSheet.create({
     },
     feederTitle: {
         fontSize: 16,
-        fontWeight: '700',
+        fontWeight: '900',
         marginLeft: 15,
     },
     
@@ -776,16 +1057,15 @@ const styles = StyleSheet.create({
     },
     recommendationTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#1f2937',
+        fontWeight: '900',
+        color: AppTheme.color.textOnGlass,
         marginLeft: 8,
     },
     recommendationList: {
-        backgroundColor: '#fff',
-        borderRadius: 20,
+        borderRadius: AppTheme.radius.panel,
+    },
+    recommendationContent: {
         paddingVertical: 5,
-        borderWidth: 1,
-        borderColor: '#f3f4f6',
     },
     recommendationCard: {
         flexDirection: 'row',
@@ -794,21 +1074,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         marginHorizontal: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: AppTheme.color.line,
     },
     recommendationIconWrapper: {
         width: 35,
         height: 35,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 8,
-        borderWidth: 2,
+        borderRadius: 14,
+        borderWidth: 1,
     },
     recommendationText: {
         flex: 1,
         fontSize: 15,
-        color: '#374151',
-        fontWeight: '500',
+        color: AppTheme.color.text,
+        fontWeight: '700',
         marginLeft: 15,
     },
 });
