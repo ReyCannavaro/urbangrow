@@ -3,8 +3,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 
-const GRADIENT_COLORS = ['#3780F2', '#2AA1AA', '#1CC162'];
-
 interface GradientIconProps {
   name: 'home' | 'robot' | 'hexagon' | 'bell' ;
   focused: boolean;

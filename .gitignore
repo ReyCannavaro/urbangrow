@@ -36,6 +36,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# Python/API runtime
+__pycache__/
+*.py[cod]
+API/*.db
+
 app-example
 
 # generated native folders

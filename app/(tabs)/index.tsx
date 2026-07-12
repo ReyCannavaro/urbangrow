@@ -1,19 +1,40 @@
-import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Alert } from 'react-native'; // Tambahkan Alert
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-// *******************************************************************
-// *** KONFIGURASI API (UBAH SESUAI IP ANDA) ***
-// Ganti dengan IP Address server Anda (misal: 'http://192.168.1.100:3000')
-const API_BASE_URL = 'http://10.0.2.2:3000'; // <--- PASTIKAN INI BENAR!
-// *******************************************************************
+const Feather = { 
+    name: 'Feather', 
+    size: 20, 
+    color: '#000', 
+    style: {}, 
+    render: (name: string, size: number, color: string, style: any) => {
+        let icon: string;
+        switch (name) {
+            case 'thermometer': icon = '🌡️'; break;
+            case 'droplet': icon = '💧'; break;
+            case 'cloud-drizzle': icon = '💦'; break;
+            case 'zap': icon = '⚡'; break;
+            default: icon = '⚫';
+        }
+        return <Text style={{ fontSize: size * 1.5, color: color, ...style }}>{icon}</Text>;
+    }
+};
 
-// --- DEFINISI TIPE DATA ---
+const LinearGradient = ({ colors, start, end, style, children }: any) => {
+    const direction = start.x === 0 && end.x === 1 ? 'to right' : 'to left';
+    
+    const gradientStyle = {
+        backgroundImage: `linear-gradient(${direction}, ${colors[0]}, ${colors[1]})`,
+    };
+
+    return <View style={[style, gradientStyle]}>{children}</View>;
+};
+
+const API_BASE_URL = 'http://10.249.160.45:5000';
+
 interface SensorData {
     temperature: number;
     ph: number;
-    ldr_value: number; // Tetap ada di tipe data karena dikirim dari server
+    ldr_value: number; 
     timestamp: string;
 }
 
@@ -21,15 +42,69 @@ interface ActuatorStatus {
     pumpStatus: 'ON' | 'OFF';
     lightStatus: 'ON' | 'OFF';
 }
-// --- AKHIR DEFINISI TIPE DATA ---
 
-// Hapus fungsi getRandomArbitrary dan generateNewData yang lama
+let simulatedSensorData: SensorData = { temperature: 25.5, ph: 6.8, ldr_value: 450, timestamp: new Date().toISOString() };
+let simulatedActuatorStatus: ActuatorStatus = { pumpStatus: 'OFF', lightStatus: 'OFF' };
+
+const simulateNewData = (currentSensorData: SensorData, currentActuatorStatus: ActuatorStatus): { sensor: SensorData, actuator: ActuatorStatus } => {
+    let tempChange = (Math.random() - 0.5) * 0.2;
+    let phChange = (Math.random() - 0.5) * 0.05;
+    
+    let newPumpStatus: 'ON' | 'OFF' = currentActuatorStatus.pumpStatus;
+    if (currentSensorData.temperature > 28.5 || currentSensorData.temperature < 20.0 || currentSensorData.ph < 6.0 || currentSensorData.ph > 7.5) {
+        newPumpStatus = "ON";
+    } else if (currentSensorData.temperature >= 20.0 && currentSensorData.temperature <= 28.0 && currentSensorData.ph >= 6.5 && currentSensorData.ph <= 7.0) {
+        newPumpStatus = "OFF";
+    }
+
+    let newLightStatus: 'ON' | 'OFF' = currentSensorData.ldr_value < 300 ? 'ON' : 'OFF';
+
+    const newSensorData: SensorData = {
+        temperature: parseFloat((currentSensorData.temperature + tempChange).toFixed(2)),
+        ph: parseFloat((currentSensorData.ph + phChange).toFixed(2)),
+        ldr_value: currentSensorData.ldr_value,
+        timestamp: new Date().toISOString(),
+    };
+
+    const newActuatorStatus: ActuatorStatus = {
+        pumpStatus: newPumpStatus,
+        lightStatus: newLightStatus,
+    };
+    
+    simulatedSensorData = newSensorData;
+    simulatedActuatorStatus = newActuatorStatus;
+
+    return { sensor: newSensorData, actuator: newActuatorStatus };
+};
+
+const fetchJson = async <T,>(path: string): Promise<T> => {
+    const response = await fetch(`${API_BASE_URL}${path}`);
+
+    if (!response.ok) {
+        throw new Error(`API ${path} returned status ${response.status}`);
+    }
+
+    return response.json();
+};
+
+const normalizeSensorData = (payload: any): SensorData => ({
+    temperature: Number(payload.temperature ?? 0),
+    ph: Number(payload.ph ?? 0),
+    ldr_value: Number(payload.ldr_value ?? payload.ldr ?? 0),
+    timestamp: payload.timestamp ?? new Date().toISOString(),
+});
+
+const normalizeActuatorStatus = (payload: any): ActuatorStatus => ({
+    pumpStatus: payload.pumpStatus === 'ON' ? 'ON' : 'OFF',
+    lightStatus: payload.lightStatus === 'ON' ? 'ON' : 'OFF',
+});
+
 
 interface DataCardProps {
     title: string;
     value: string;
     unit: string;
-    iconName: keyof typeof Feather;
+    iconName: 'thermometer' | 'droplet' | 'cloud-drizzle' | 'zap'; 
     bgColor: string;
     iconColor: string;
     borderColor: string;
@@ -38,8 +113,8 @@ interface DataCardProps {
 const DataCard: React.FC<DataCardProps> = ({ title, value, unit, iconName, bgColor, iconColor, borderColor }) => (
     <View style={[styles.card, { backgroundColor: bgColor, borderColor: borderColor }]}>
         <View style={styles.cardHeader}>
-            <Text style={[styles.cardNormalLabel, { borderColor: borderColor, color: borderColor }]}>Normal</Text>
-            <Feather name={iconName} size={28} color={iconColor} style={styles.cardIcon} />
+            <Text style={[styles.cardNormalLabel, { borderColor: borderColor, color: borderColor }]}>Ideal Range</Text>
+            {Feather.render(iconName, 28, iconColor, styles.cardIcon)}
         </View>
         <Text style={[styles.cardTitle, { color: iconColor }]}>{title}</Text>
         <View style={styles.cardValueContainer}>
@@ -110,10 +185,19 @@ interface WaterConditionCardProps {
     currentTemp: number;
     currentPh: number;
     isLoading: boolean;
+    lastUpdate: string;
 }
 
-const WaterConditionCard: React.FC<WaterConditionCardProps> = ({ currentTemp, currentPh, isLoading }) => {
-    // Tampilkan loading jika data masih 0.0 atau sedang fetch
+const WaterConditionCard: React.FC<WaterConditionCardProps> = ({ currentTemp, currentPh, isLoading, lastUpdate }) => {
+    
+    const { tempStatus, phStatus, conclusion, dynamicBorderColor } = useMemo(() => 
+        analyzeWaterCondition(currentTemp, currentPh), 
+        [currentTemp, currentPh]
+    ); 
+
+    const overallLabel = (dynamicBorderColor === '#10b981') ? 'OPTIMAL' : (dynamicBorderColor === '#ef4444' ? 'KRITIS' : 'WASPADA');
+
+
     if (isLoading && currentTemp === 0.0) {
         return (
             <View style={[styles.card, styles.oxygenCard, { borderColor: '#9ca3af', width: '100%' }]}>
@@ -122,29 +206,31 @@ const WaterConditionCard: React.FC<WaterConditionCardProps> = ({ currentTemp, cu
         );
     }
 
-    const { tempStatus, phStatus, conclusion, dynamicBorderColor } = analyzeWaterCondition(currentTemp, currentPh); 
-    const overallLabel = (tempStatus === 'Hangat' && phStatus === 'Ideal (Netral)') ? 'Optimal' : 'Perlu Cek';
-
+    const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    const formattedTime = new Date(lastUpdate).toLocaleTimeString('id-ID', timeOptions);
+    
     return ( 
         <View style={[styles.card, styles.oxygenCard, { borderColor: dynamicBorderColor, width: '100%' }]}> 
             <View style={styles.oxygenHeader}> 
-                <Text  
+                <Text 
                     style={[ 
-                        styles.cardNormalLabel,  
-                        styles.oxygenNormalLabel,  
-                        { borderColor: dynamicBorderColor, color: dynamicBorderColor, backgroundColor: 'rgba(255, 255, 255, 0.9)' } // Sedikit ubah background agar lebih terlihat 
+                        styles.cardNormalLabel, 
+                        styles.oxygenNormalLabel, 
+                        { borderColor: dynamicBorderColor, color: dynamicBorderColor, backgroundColor: '#fff', fontSize: 12 }
                     ]} 
                 > 
-                    {overallLabel} 
+                    {overallLabel}
                 </Text> 
             </View> 
             <View style={styles.oxygenContent}>
                 <View style={[styles.oxygenRing, { borderColor: dynamicBorderColor }]}> 
-                    <Feather name="cloud-drizzle" size={50} color={dynamicBorderColor} style={{ paddingLeft: 0, marginLeft: -5 }} /> 
+                    {Feather.render('cloud-drizzle', 50, dynamicBorderColor, { paddingLeft: 0, marginLeft: -5 })}
                 </View> 
                 <View style={styles.oxygenDetails}> 
-                    <Text style={styles.oxygenTitle}>Kondisi Air</Text> 
-                    <Text style={[styles.oxygenValue, { fontSize: 24, lineHeight: 30 }]}>{tempStatus} / {phStatus}</Text> 
+                    <Text style={styles.oxygenTitle}>Status Air (Update: {formattedTime})</Text> 
+                    <Text style={[styles.oxygenValue, { fontSize: 24, lineHeight: 30 }]}>
+                        {tempStatus} / {phStatus}
+                    </Text> 
                 </View> 
             </View> 
             <Text style={{ fontSize: 13, color: '#4b5563', marginTop: 10, lineHeight: 18, paddingHorizontal: 5 }}> 
@@ -168,64 +254,76 @@ const StatusButton: React.FC<StatusButtonProps> = ({ label, value, borderColor }
 ); 
 
 const HomePage: React.FC = () => {
-    // 1. State untuk menyimpan data sensor dan aktuator
-    const [sensorData, setSensorData] = useState<SensorData>({ temperature: 0.0, ph: 0.0, ldr_value: 0, timestamp: '' });
+    const [sensorData, setSensorData] = useState<SensorData>({ temperature: 0.0, ph: 0.0, ldr_value: 0, timestamp: new Date().toISOString() });
     const [actuatorStatus, setActuatorStatus] = useState<ActuatorStatus>({ pumpStatus: 'OFF', lightStatus: 'OFF' });
     const [isLoading, setIsLoading] = useState(true);
     const [isConnected, setIsConnected] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
-    // 2. Fungsi untuk mengambil data dari server
-    const fetchData = async () => {
+    const CustomAlert = () => {
+        if (!errorMessage) return null;
+
+        return (
+            <View style={styles.customAlert}>
+                <Text style={styles.customAlertTitle}>Koneksi Gagal 🔴</Text>
+                <Text style={styles.customAlertMessage}>{errorMessage}</Text>
+                <View style={styles.customAlertButtonContainer}>
+                    <Text style={styles.customAlertButtonText} onPress={() => setErrorMessage('')}>
+                        OK
+                    </Text>
+                </View>
+            </View>
+        );
+    };
+
+    const fetchData = useCallback(async () => {
         try {
-            // Ambil Data Sensor Terbaru
-            const sensorResponse = await fetch(`${API_BASE_URL}/api/latest-reading`);
-            const sensorJson = await sensorResponse.json();
-            
-            // Ambil Status Aktuator
-            const actuatorResponse = await fetch(`${API_BASE_URL}/api/actuator-status`);
-            const actuatorJson = await actuatorResponse.json();
-            
-            setSensorData(sensorJson);
-            setActuatorStatus(actuatorJson);
+            const [latestReading, actuatorData] = await Promise.all([
+                fetchJson<SensorData>('/api/latest-reading'),
+                fetchJson<ActuatorStatus>('/api/actuator-status'),
+            ]);
+
+            const sensor = normalizeSensorData(latestReading);
+            const actuator = normalizeActuatorStatus(actuatorData);
+
+            setSensorData(sensor);
+            setActuatorStatus(actuator);
             setIsConnected(true);
+            setErrorMessage('');
 
         } catch (error) {
-            console.error("Error fetching data:", error);
+            console.warn("API unavailable, using local simulation:", error);
+            const { sensor, actuator } = simulateNewData(simulatedSensorData, simulatedActuatorStatus);
+
+            setSensorData(sensor);
+            setActuatorStatus(actuator);
             setIsConnected(false);
             
-            // Tampilkan pesan error hanya sekali saat pertama kali gagal
             if (isLoading) {
-                 Alert.alert(
-                    "Koneksi Gagal 🔴",
-                    `Tidak dapat terhubung ke server API di ${API_BASE_URL}. Pastikan server.js berjalan dan IP sudah benar.`,
-                    [{ text: "OK" }]
-                );
+                setErrorMessage(`Tidak dapat terhubung ke server API di ${API_BASE_URL}. Aplikasi ini menggunakan SIMULASI DATA LOKAL.`);
             }
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [isLoading]);
 
-    // 3. useEffect untuk menjalankan fetching secara berkala (setiap 3 detik)
     useEffect(() => {
-        fetchData(); // Ambil data segera saat komponen di-mount
+        fetchData(); 
         
-        const intervalId = setInterval(fetchData, 3000); // Ambil data setiap 3 detik
+        const intervalId = setInterval(fetchData, 3000); 
 
-        // Cleanup function
         return () => clearInterval(intervalId);
-    }, []); // Dependency array kosong agar interval hanya dibuat sekali
+    }, [fetchData]); 
 
-    // 4. Mapping data sensor
-    // Gunakan 0.0 jika data belum terambil (atau null/undefined)
     const currentTemp = sensorData.temperature || 0.0;
     const currentPh = sensorData.ph || 0.0;
 
-    // Perbarui Tampilan Header dengan Status Koneksi
-    const headerStatus = isConnected ? '🟢' : '🔴';
+    const headerStatus = isConnected ? '🟢 (API)' : '🔴 (Simulasi)';
 
     return ( 
         <View style={styles.container}> 
+            <CustomAlert />
+
             <LinearGradient 
                 colors={['#3b82f6', '#10b981']} 
                 start={{ x: 0, y: 0 }} 
@@ -259,35 +357,31 @@ const HomePage: React.FC = () => {
                     /> 
                 </View> 
 
-                <WaterConditionCard currentTemp={currentTemp} currentPh={currentPh} isLoading={isLoading} /> 
+                <WaterConditionCard currentTemp={currentTemp} currentPh={currentPh} isLoading={isLoading} lastUpdate={sensorData.timestamp} /> 
 
-                {/* Status Aktuator Baru */}
                 <View style={styles.statusHeader}> 
-                    <Feather name="zap" size={20} color="#6366f1" /> 
+                    {Feather.render('zap', 20, '#6366f1', {})}
                     <Text style={styles.statusTitle}>Kontrol Aktuator</Text> 
                 </View> 
 
                 <View style={styles.statusGrid}> 
-                    {/* Status Pompa Air */}
                     <StatusButton 
                         label="Pompa Air" 
                         value={actuatorStatus.pumpStatus} 
                         borderColor={actuatorStatus.pumpStatus === 'ON' ? '#ef4444' : '#6b7280'} 
                     /> 
-                    {/* Status Lampu */}
                     <StatusButton 
                         label="Lampu (LED Grow)" 
                         value={actuatorStatus.lightStatus} 
                         borderColor={actuatorStatus.lightStatus === 'ON' ? '#f59e0b' : '#6b7280'} 
                     /> 
-                    {/* Data ikan dan tanaman tetap statis sesuai desain lama */}
                     <StatusButton label="Lele" value="27 Ekor" borderColor="#3b82f6" /> 
                     <StatusButton label="Nila" value="27 Ekor" borderColor="#3b82f6" /> 
                     <StatusButton label="Pakcoy" value="14 Hari" borderColor="#10b981" /> 
                     <StatusButton label="Kangkung" value="17 Hari" borderColor="#10b981" /> 
                 </View> 
                 
-                <View style={{ height: 100 }} />  
+                <View style={{ height: 100 }} />  
             </ScrollView> 
         </View> 
     ); 
@@ -312,6 +406,7 @@ const styles = StyleSheet.create({
         marginBottom: 10, 
         marginHorizontal: 15, 
         borderRadius: 20, 
+        backgroundSize: '100% 100%',
     }, 
     headerText: { 
         fontSize: 18, 
@@ -458,5 +553,43 @@ const styles = StyleSheet.create({
         fontSize: 16, 
         color: '#6b7280', 
         marginTop: 5, 
-    }, 
+    },
+    
+    customAlert: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        margin: 20,
+        marginTop: 50,
+        padding: 15,
+        backgroundColor: '#fee2e2',
+        borderColor: '#ef4444',
+        borderWidth: 1,
+        borderRadius: 10,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+    },
+    customAlertTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#dc2626',
+        marginBottom: 5,
+    },
+    customAlertMessage: {
+        fontSize: 14,
+        color: '#b91c1c',
+    },
+    customAlertButtonContainer: {
+        alignSelf: 'flex-end',
+        marginTop: 10,
+    },
+    customAlertButtonText: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#dc2626',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        cursor: 'pointer',
+    }
 });

@@ -321,8 +321,6 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 5,
         elevation: 5,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     headerTitle: {
         fontSize: 20,
