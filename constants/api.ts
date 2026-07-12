@@ -37,6 +37,7 @@ export const API_PROFILE = getConfiguredApiProfile();
 export const API_BASE_URL = normalizeBaseUrl(
   process.env.EXPO_PUBLIC_API_BASE_URL || API_BASE_URL_PROFILES[API_PROFILE],
 );
+export const API_TOKEN = process.env.EXPO_PUBLIC_API_TOKEN || '';
 
 export type ActuatorKey = 'pumpStatus' | 'lightStatus';
 export type ActuatorValue = 'ON' | 'OFF';
@@ -44,6 +45,37 @@ export type ActuatorValue = 'ON' | 'OFF';
 export interface ActuatorStatus {
   pumpStatus: ActuatorValue;
   lightStatus: ActuatorValue;
+}
+
+export type ActuatorCommandStatus = 'pending' | 'success' | 'failed';
+
+export interface ActuatorCommand {
+  id: number;
+  device_id: string;
+  actuator_key: ActuatorKey;
+  target_value: ActuatorValue;
+  status: ActuatorCommandStatus;
+  delivery_method: 'queue' | 'http' | string;
+  attempts: number;
+  error_message?: string | null;
+  requested_by: string;
+  requested_at: string;
+  delivered_at?: string | null;
+  completed_at?: string | null;
+  payload?: {
+    command_id: number;
+    device_id: string;
+    key: ActuatorKey;
+    value: ActuatorValue;
+    mqtt_topic: string;
+    requested_at: string;
+  };
+}
+
+export interface ActuatorControlResponse {
+  message: string;
+  command: ActuatorCommand;
+  actuator: ActuatorStatus;
 }
 
 export const apiGet = async <T,>(path: string): Promise<T> => {
@@ -57,9 +89,15 @@ export const apiGet = async <T,>(path: string): Promise<T> => {
 };
 
 export const apiPost = async <T,>(path: string, body: unknown): Promise<T> => {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+
+  if (API_TOKEN) {
+    headers['X-API-Token'] = API_TOKEN;
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 

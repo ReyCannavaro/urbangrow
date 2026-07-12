@@ -97,6 +97,27 @@ set URBANGROW_API_PORT=5000
 set URBANGROW_DATABASE_PATH=API\urban_grow.db
 ```
 
+Security ringan opsional:
+
+```bash
+set URBANGROW_API_TOKEN=change-this-local-token
+set URBANGROW_RATE_LIMIT_WINDOW_SECONDS=60
+set URBANGROW_RATE_LIMIT_MAX_REQUESTS=120
+set URBANGROW_MAX_JSON_BODY_BYTES=8192
+```
+
+Jika `URBANGROW_API_TOKEN` diisi, endpoint POST sensitif seperti sensor, kontrol aktuator, ack command, dan clear notifikasi wajib mengirim header:
+
+```text
+X-API-Token: change-this-local-token
+```
+
+Untuk aplikasi Expo lokal/demo, samakan token frontend:
+
+```bash
+EXPO_PUBLIC_API_TOKEN=change-this-local-token
+```
+
 ## Setup Gemini Untuk AgriBot
 
 API key Gemini tidak disimpan di frontend. Set key di backend:
@@ -145,11 +166,16 @@ npm run web
 | `POST` | `/api/update-sensor` | Alias input sensor |
 | `POST` | `/receive_data` | Kompatibilitas endpoint IoT lama |
 | `GET` | `/api/latest-reading` | Ambil data sensor terbaru |
-| `GET` | `/api/sensor-history?limit=12` | Ambil riwayat sensor |
+| `GET` | `/api/sensor-history?limit=1000&hours=24` | Ambil riwayat sensor |
 | `GET` | `/api/sensor-log` | Alias riwayat sensor |
 | `GET` | `/api/actuator-status` | Ambil status pompa/lampu |
-| `POST` | `/api/actuator-control` | Ubah status aktuator |
+| `POST` | `/api/actuator-control` | Buat command kontrol aktuator |
+| `GET` | `/api/actuator-commands?limit=20` | Ambil riwayat command aktuator |
+| `GET` | `/api/actuator-commands/next?device_id=esp32-main` | ESP mengambil command pending berikutnya |
+| `POST` | `/api/actuator-commands/ack` | ESP mengirim hasil eksekusi command |
+| `GET` | `/api/actuator-logs?limit=50` | Ambil log perubahan aktuator |
 | `GET` | `/api/notifications` | Ambil notifikasi real |
+| `POST` | `/api/notifications/clear` | Bersihkan riwayat notifikasi |
 | `POST` | `/api/chat` | Kirim pesan ke AgriBot |
 
 ## Contoh Request Sensor
@@ -162,6 +188,15 @@ curl.exe -X POST http://localhost:5000/api/sensor-readings `
   -d "{\"temperature\":27.4,\"ph\":6.7,\"ldr_value\":420}"
 ```
 
+Jika API token aktif:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/sensor-readings `
+  -H "Content-Type: application/json" `
+  -H "X-API-Token: change-this-local-token" `
+  -d "{\"temperature\":27.4,\"ph\":6.7,\"ldr_value\":420}"
+```
+
 Contoh kondisi pH rendah:
 
 ```powershell
@@ -170,12 +205,77 @@ curl.exe -X POST http://localhost:5000/api/sensor-readings `
   -d "{\"temperature\":26.4,\"ph\":5.6,\"ldr_value\":430}"
 ```
 
+Validasi data sensor:
+
+- `ph` wajib berada di rentang `0` sampai `14`.
+- `temperature` wajib berada di rentang `0` sampai `60` derajat C.
+- `ldr_value` tidak boleh negatif.
+- `timestamp` boleh dikosongkan agar backend memakai waktu server.
+- Jika `timestamp` dikirim, nilainya harus format ISO 8601 valid.
+
+Contoh riwayat 24 jam terakhir:
+
+```powershell
+curl.exe "http://localhost:5000/api/sensor-history?limit=1000&hours=24"
+```
+
 Contoh kontrol aktuator:
 
 ```powershell
 curl.exe -X POST http://localhost:5000/api/actuator-control `
   -H "Content-Type: application/json" `
   -d "{\"key\":\"pumpStatus\",\"value\":\"ON\"}"
+```
+
+## Integrasi Aktuator Fisik
+
+Kontrol pompa/lampu sekarang memakai command queue. Saat aplikasi mengirim kontrol, backend membuat command dengan status `pending`, `success`, atau `failed`.
+
+Mode HTTP push langsung ke ESP:
+
+```bash
+set URBANGROW_ESP_HTTP_CONTROL_URL=http://192.168.1.50/actuator
+set URBANGROW_DEFAULT_DEVICE_ID=esp32-main
+python API\app.py
+```
+
+Payload yang dikirim backend ke ESP:
+
+```json
+{
+  "command_id": 1,
+  "device_id": "esp32-main",
+  "key": "pumpStatus",
+  "value": "ON",
+  "mqtt_topic": "urbangrow/actuator/commands",
+  "requested_at": "2026-07-12T06:00:00+00:00"
+}
+```
+
+Mode polling HTTP dari ESP:
+
+```powershell
+curl.exe "http://localhost:5000/api/actuator-commands/next?device_id=esp32-main"
+```
+
+Setelah ESP menjalankan command, kirim ack:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/actuator-commands/ack `
+  -H "Content-Type: application/json" `
+  -d "{\"command_id\":1,\"status\":\"success\",\"message\":\"Pompa menyala\"}"
+```
+
+Jika memakai MQTT bridge, publish payload command ke topic:
+
+```text
+urbangrow/actuator/commands
+```
+
+Topic dapat diubah lewat:
+
+```bash
+set URBANGROW_MQTT_COMMAND_TOPIC=urbangrow/actuator/commands
 ```
 
 ## Validasi
@@ -190,6 +290,12 @@ Backend syntax check:
 
 ```bash
 python -m py_compile API\app.py
+```
+
+Backend test:
+
+```bash
+python -m unittest discover -s tests
 ```
 
 ## Troubleshooting

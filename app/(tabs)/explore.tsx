@@ -12,7 +12,15 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ActuatorKey, ActuatorStatus, apiGet, apiPost, normalizeActuatorStatus } from '@/constants/api';
+import {
+    ActuatorCommand,
+    ActuatorControlResponse,
+    ActuatorKey,
+    ActuatorStatus,
+    apiGet,
+    apiPost,
+    normalizeActuatorStatus,
+} from '@/constants/api';
 
 const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
 const COLOR_BLUE = '#60a5fa';
@@ -66,6 +74,33 @@ const sensorPresets: SensorPreset[] = [
     { id: 'hot', label: 'Suhu Tinggi', temperature: 31.2, ph: 7.1, ldrValue: 410, color: '#f97316' },
     { id: 'low-light', label: 'Cahaya Rendah', temperature: 25.9, ph: 6.9, ldrValue: 180, color: '#facc15' },
 ];
+
+const getCommandStatusCopy = (command: ActuatorCommand) => {
+    const actuatorName = command.actuator_key === 'pumpStatus' ? 'Pompa Air' : 'Lampu Grow';
+    const targetLabel = command.target_value === 'ON' ? 'ON' : 'OFF';
+
+    if (command.status === 'success') {
+        return `${actuatorName} berhasil disetel ke ${targetLabel}.`;
+    }
+
+    if (command.status === 'failed') {
+        return command.error_message || `${actuatorName} gagal disetel ke ${targetLabel}.`;
+    }
+
+    return `${actuatorName} menunggu eksekusi ESP untuk mode ${targetLabel}.`;
+};
+
+const getCommandStatusColor = (status: ActuatorCommand['status']) => {
+    if (status === 'success') {
+        return '#059669';
+    }
+
+    if (status === 'failed') {
+        return '#dc2626';
+    }
+
+    return '#d97706';
+};
 
 interface MainControlCardProps extends ControlItem {
     isDisabled: boolean;
@@ -158,6 +193,8 @@ const ExplorePage: React.FC = () => {
     const [actuatorStatus, setActuatorStatus] = useState<ActuatorStatus>({ pumpStatus: 'OFF', lightStatus: 'OFF' });
     const [isActuatorLoading, setIsActuatorLoading] = useState(true);
     const [activeControl, setActiveControl] = useState<ActuatorKey | null>(null);
+    const [latestActuatorCommand, setLatestActuatorCommand] = useState<ActuatorCommand | null>(null);
+    const [commandStatusMessage, setCommandStatusMessage] = useState('');
     const [controlError, setControlError] = useState('');
     const [manualSensorForm, setManualSensorForm] = useState<ManualSensorForm>({
         temperature: '26.8',
@@ -181,22 +218,42 @@ const ExplorePage: React.FC = () => {
         }
     }, []);
 
+    const fetchLatestActuatorCommand = useCallback(async () => {
+        try {
+            const commands = await apiGet<ActuatorCommand[]>('/api/actuator-commands?limit=1');
+            setLatestActuatorCommand(commands[0] ?? null);
+        } catch (error) {
+            console.warn('Failed to load actuator command queue:', error);
+        }
+    }, []);
+
     useEffect(() => {
         fetchActuatorStatus();
-    }, [fetchActuatorStatus]);
+        fetchLatestActuatorCommand();
+    }, [fetchActuatorStatus, fetchLatestActuatorCommand]);
 
     const handleActuatorToggle = async (item: ControlItem, nextValue: 'ON' | 'OFF') => {
         setActiveControl(item.actuatorKey);
+        setCommandStatusMessage('');
         setControlError('');
 
         try {
-            const updatedStatus = await apiPost<ActuatorStatus>('/api/actuator-control', {
+            const response = await apiPost<ActuatorControlResponse>('/api/actuator-control', {
                 key: item.actuatorKey,
                 value: nextValue,
             });
 
-            setActuatorStatus(normalizeActuatorStatus(updatedStatus));
-            Alert.alert(item.title, `${item.title} telah ${nextValue === 'ON' ? 'diaktifkan (ON)' : 'dimatikan (OFF)'}.`);
+            setActuatorStatus(normalizeActuatorStatus(response.actuator));
+            setLatestActuatorCommand(response.command);
+            setCommandStatusMessage(getCommandStatusCopy(response.command));
+
+            if (response.command.status === 'pending') {
+                Alert.alert(item.title, 'Perintah masuk antrean dan menunggu ack dari ESP.');
+            } else if (response.command.status === 'failed') {
+                Alert.alert('Kontrol Gagal', getCommandStatusCopy(response.command));
+            } else {
+                Alert.alert(item.title, `${item.title} telah ${nextValue === 'ON' ? 'diaktifkan (ON)' : 'dimatikan (OFF)'}.`);
+            }
         } catch (error) {
             console.warn('Failed to update actuator status:', error);
             setControlError('Gagal mengirim perintah ke API. Pastikan backend sedang berjalan.');
@@ -298,6 +355,34 @@ const ExplorePage: React.FC = () => {
                         <View style={styles.loadingRow}>
                             <ActivityIndicator size="small" color="#3b82f6" />
                             <Text style={styles.loadingText}>Memuat status perangkat...</Text>
+                        </View>
+                    ) : null}
+                    {latestActuatorCommand ? (
+                        <View
+                            style={[
+                                styles.commandStatusCard,
+                                { borderColor: getCommandStatusColor(latestActuatorCommand.status) },
+                            ]}
+                        >
+                            <View style={styles.commandStatusHeader}>
+                                <Text
+                                    style={[
+                                        styles.commandStatusBadge,
+                                        { color: getCommandStatusColor(latestActuatorCommand.status) },
+                                    ]}
+                                >
+                                    {latestActuatorCommand.status.toUpperCase()}
+                                </Text>
+                                <Text style={styles.commandStatusMeta}>
+                                    #{latestActuatorCommand.id} - {latestActuatorCommand.delivery_method}
+                                </Text>
+                            </View>
+                            <Text style={styles.commandStatusText}>
+                                {commandStatusMessage || getCommandStatusCopy(latestActuatorCommand)}
+                            </Text>
+                            <Text style={styles.commandStatusHint}>
+                                Device: {latestActuatorCommand.device_id} | Attempts: {latestActuatorCommand.attempts}
+                            </Text>
                         </View>
                     ) : null}
                 </View>
@@ -504,6 +589,41 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '500',
         marginLeft: 8,
+    },
+    commandStatusCard: {
+        backgroundColor: '#fff',
+        borderWidth: 1.5,
+        borderRadius: 14,
+        padding: 12,
+        marginHorizontal: 5,
+        marginBottom: 12,
+    },
+    commandStatusHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    commandStatusBadge: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
+    commandStatusMeta: {
+        color: '#6b7280',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    commandStatusText: {
+        color: '#1f2937',
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: '600',
+    },
+    commandStatusHint: {
+        color: '#6b7280',
+        fontSize: 12,
+        lineHeight: 16,
+        marginTop: 4,
     },
     mainControlCard: {
         flex: 1,

@@ -1,11 +1,13 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import { StaticTabBarIcon } from '../../components/StaticTabBarIcon'; 
+import { ApiStatusBanner } from '@/components/system/ApiStatusBanner';
+import { StaticTabBarIcon } from '../../components/StaticTabBarIcon';
 
 export default function TabLayout() {
   return (
     <View style={styles.safeArea}>
+      <ApiStatusBanner />
       <Tabs
         screenOptions={{
           headerShown: false,
