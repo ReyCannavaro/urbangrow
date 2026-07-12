@@ -199,16 +199,30 @@ const NotificationsPage: React.FC = () => {
                 </LinearGradient>
 
                 <View style={styles.contentArea}>
-                    {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+                    {errorMessage ? (
+                        <View style={styles.errorBanner}>
+                            <Feather name="alert-circle" size={16} color="#dc2626" />
+                            <Text style={styles.errorText}>{errorMessage}</Text>
+                        </View>
+                    ) : null}
 
                     {isLoading ? (
                         <View style={styles.loadingState}>
-                            <ActivityIndicator size="small" color="#3b82f6" />
-                            <Text style={styles.loadingText}>Memuat notifikasi sistem...</Text>
+                            {[0, 1, 2].map(item => (
+                                <View key={item} style={styles.loadingCard}>
+                                    <View style={styles.loadingIconBlock} />
+                                    <View style={styles.loadingCopyBlock}>
+                                        <View style={styles.loadingTitleBlock} />
+                                        <View style={styles.loadingLineBlock} />
+                                    </View>
+                                </View>
+                            ))}
                         </View>
                     ) : Object.keys(groupedNotifications).length === 0 ? (
                         <View style={styles.emptyState}>
-                            <Feather name="bell-off" size={60} color="#9ca3af" style={{ marginBottom: 15 }} />
+                            <View style={styles.emptyIconWrap}>
+                                <Feather name="bell-off" size={34} color="#64748b" />
+                            </View>
                             <Text style={styles.emptyStateText}>Tidak ada notifikasi saat ini.</Text>
                             <Text style={styles.emptyStateSubtitle}>Status sistem Anda dalam kondisi baik.</Text>
                         </View>
@@ -236,15 +250,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#f9fafb',
     },
     header: {
-        paddingTop: 20,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
+        paddingVertical: 18,
+        paddingHorizontal: 18,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 25,
-        marginBottom: 10,
-        marginHorizontal: 15,
-        borderRadius: 20,
+        marginBottom: 14,
+        marginHorizontal: 16,
+        borderRadius: 18,
     },
     headerTitle: {
         fontSize: 20,
@@ -271,7 +284,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(255, 255, 255, 0.2)',
         paddingHorizontal: 15,
         paddingVertical: 6,
-        borderRadius: 20,
+        borderRadius: 999,
     },
     clearButtonText: {
         color: '#fff',
@@ -280,26 +293,61 @@ const styles = StyleSheet.create({
         marginLeft: 8,
     },
     contentArea: {
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
+    },
+    errorBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#fecaca',
+        borderRadius: 14,
+        backgroundColor: '#fef2f2',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        marginBottom: 10,
     },
     errorText: {
         color: '#dc2626',
         fontSize: 13,
         lineHeight: 18,
-        marginTop: 6,
-        marginBottom: 8,
+        marginLeft: 8,
+        flex: 1,
     },
     loadingState: {
+        paddingVertical: 6,
+    },
+    loadingCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 30,
+        padding: 15,
+        borderRadius: 16,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        backgroundColor: '#fff',
     },
-    loadingText: {
-        color: '#4b5563',
-        fontSize: 14,
-        fontWeight: '500',
-        marginLeft: 10,
+    loadingIconBlock: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#e5e7eb',
+        marginRight: 14,
+    },
+    loadingCopyBlock: {
+        flex: 1,
+    },
+    loadingTitleBlock: {
+        width: '52%',
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#e5e7eb',
+        marginBottom: 9,
+    },
+    loadingLineBlock: {
+        width: '86%',
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: '#f1f5f9',
     },
     dateGroup: {
         marginBottom: 20,
@@ -315,11 +363,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        borderRadius: 15,
+        borderRadius: 16,
         marginBottom: 10,
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        shadowColor: '#000',
+        shadowColor: '#0f172a',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 3,
@@ -351,11 +399,24 @@ const styles = StyleSheet.create({
         marginTop: 5,
     },
     emptyState: {
-        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 50,
-        marginTop: 50,
+        paddingVertical: 44,
+        paddingHorizontal: 18,
+        marginTop: 26,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 18,
+        backgroundColor: '#fff',
+    },
+    emptyIconWrap: {
+        width: 68,
+        height: 68,
+        borderRadius: 34,
+        backgroundColor: '#f1f5f9',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 15,
     },
     emptyStateText: {
         fontSize: 18,

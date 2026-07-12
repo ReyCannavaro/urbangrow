@@ -271,9 +271,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 20,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
   },
   historyHeader: {
     flexDirection: 'row',
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   },
   historyTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#1f2937',
   },
   historySubtitle: {
@@ -293,9 +293,9 @@ const styles = StyleSheet.create({
   },
   cardNormalLabel: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '800',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 2,
     alignSelf: 'flex-start',
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   rangeSelector: {
     flexDirection: 'row',
     backgroundColor: '#f3f4f6',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 4,
     marginBottom: 12,
   },
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   trendBox: {
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 10,
     backgroundColor: '#f9fafb',
     marginBottom: 10,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   },
   trendValue: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginTop: 2,
     marginBottom: 8,
   },
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     height: CHART_HEIGHT,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#fff',
     overflow: 'hidden',
     position: 'relative',
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   historyTable: {
     borderWidth: 1,
     borderColor: '#f3f4f6',
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   historyTableHeader: {

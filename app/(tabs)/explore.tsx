@@ -23,9 +23,12 @@ import {
 } from '@/constants/api';
 
 const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
-const COLOR_BLUE = '#60a5fa';
-const COLOR_YELLOW = '#facc15';
+const COLOR_BLUE = '#3b82f6';
+const COLOR_YELLOW = '#eab308';
 const COLOR_ORANGE = '#f97316';
+const COLOR_SUCCESS = '#10b981';
+const COLOR_MUTED = '#94a3b8';
+const COLOR_DANGER = '#dc2626';
 
 interface ControlItem {
     id: 'pompa' | 'lampu';
@@ -65,7 +68,7 @@ interface SensorPreset {
 const recommendationData: RecommendationItem[] = [
     { id: 1, text: 'Kondisi optimal untuk pertumbuhan sayur', icon: 'check-circle', color: '#10b981' },
     { id: 2, text: 'Pertimbangkan panen kangkung minggu ini', icon: 'alert-triangle', color: '#facc15' },
-    { id: 3, text: 'Berapa Ph air dengan kualitas terbaik', icon: 'droplet', color: '#3b82f6' },
+    { id: 3, text: 'Berapa pH air dengan kualitas terbaik', icon: 'droplet', color: '#3b82f6' },
 ];
 
 const sensorPresets: SensorPreset[] = [
@@ -92,11 +95,11 @@ const getCommandStatusCopy = (command: ActuatorCommand) => {
 
 const getCommandStatusColor = (status: ActuatorCommand['status']) => {
     if (status === 'success') {
-        return '#059669';
+        return COLOR_SUCCESS;
     }
 
     if (status === 'failed') {
-        return '#dc2626';
+        return COLOR_DANGER;
     }
 
     return '#d97706';
@@ -111,11 +114,11 @@ interface MainControlCardProps extends ControlItem {
 const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, isDisabled, isOn, onToggle, ...item }) => {
     const cardStyle = {
         backgroundColor: isOn ? color + '20' : '#fefefe', 
-        borderColor: isOn ? color : '#cbd5e1',
+        borderColor: isOn ? color : '#e2e8f0',
     };
 
-    const iconColor = isOn ? color : '#6b7280';
-    const statusBgColor = isOn ? color : '#ef4444';
+    const iconColor = isOn ? color : '#64748b';
+    const statusBgColor = isOn ? COLOR_SUCCESS : COLOR_MUTED;
 
     return (
         <Pressable 
@@ -499,7 +502,7 @@ const ExplorePage: React.FC = () => {
                                 Feeder Otomatis
                             </Text>
                         </View>
-                        <View style={[styles.controlStatusButton, { backgroundColor: isFeederActive ? '#10b981' : '#ef4444' }]}>
+                        <View style={[styles.controlStatusButton, { backgroundColor: isFeederActive ? COLOR_SUCCESS : COLOR_MUTED }]}>
                             <Text style={styles.controlStatusText}>
                                 {isFeederActive ? 'ACTIVE' : 'INACTIVE'}
                             </Text>
@@ -533,15 +536,14 @@ const styles = StyleSheet.create({
     },
 
     header: {
-        paddingTop: 20,
-        paddingBottom: 20,
-        paddingHorizontal: 20,
+        paddingVertical: 18,
+        paddingHorizontal: 18,
         justifyContent: 'center',
         alignItems: 'center',
         marginTop: 25,
-        marginBottom: 10,
-        marginHorizontal: 15,
-        borderRadius: 20,
+        marginBottom: 14,
+        marginHorizontal: 16,
+        borderRadius: 18,
     },
     headerTitle: {
         fontSize: 20,
@@ -550,32 +552,44 @@ const styles = StyleSheet.create({
     },
 
     section: {
-        paddingHorizontal: 15,
-        marginTop: 20,
+        paddingHorizontal: 16,
+        marginTop: 18,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: '700',
         color: '#1f2937',
-        marginBottom: 10,
+        marginBottom: 12,
     },
 
     mainControlsRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 15,
+        marginBottom: 12,
     },
     errorText: {
-        color: '#dc2626',
+        color: COLOR_DANGER,
         fontSize: 13,
         lineHeight: 18,
         marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#fecaca',
+        borderRadius: 12,
+        backgroundColor: '#fef2f2',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
     },
     successText: {
         color: '#059669',
         fontSize: 13,
         lineHeight: 18,
         marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#bbf7d0',
+        borderRadius: 12,
+        backgroundColor: '#f0fdf4',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
     },
     loadingRow: {
         flexDirection: 'row',
@@ -593,7 +607,7 @@ const styles = StyleSheet.create({
     commandStatusCard: {
         backgroundColor: '#fff',
         borderWidth: 1.5,
-        borderRadius: 14,
+        borderRadius: 16,
         padding: 12,
         marginHorizontal: 5,
         marginBottom: 12,
@@ -627,9 +641,9 @@ const styles = StyleSheet.create({
     },
     mainControlCard: {
         flex: 1,
-        height: 150,
-        borderRadius: 20,
-        padding: 15,
+        minHeight: 148,
+        borderRadius: 16,
+        padding: 14,
         alignItems: 'center',
         justifyContent: 'space-between',
         marginHorizontal: 5,
@@ -646,7 +660,7 @@ const styles = StyleSheet.create({
     controlStatusButton: {
         paddingHorizontal: 15,
         paddingVertical: 4,
-        borderRadius: 20,
+        borderRadius: 999,
         marginTop: 8,
     },
     controlStatusText: {
@@ -732,12 +746,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 20,
         marginHorizontal: 5,
-        borderRadius: 20,
-        shadowColor: '#000',
+        borderRadius: 16,
+        shadowColor: '#0f172a',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 3,
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
     },
     actionTitle: {
         fontSize: 16,
@@ -756,7 +770,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 20,
-        borderRadius: 20,
+        borderRadius: 16,
         borderWidth: 2,
     },
     controlInfo: {
@@ -782,7 +796,7 @@ const styles = StyleSheet.create({
     },
     recommendationList: {
         backgroundColor: '#fff',
-        borderRadius: 20,
+        borderRadius: 16,
         paddingVertical: 5,
         borderWidth: 1,
         borderColor: '#f3f4f6',

@@ -30,7 +30,15 @@ export const WaterConditionCard: React.FC<WaterConditionCardProps> = ({
   if (isLoading && currentTemp === 0) {
     return (
       <View style={[styles.card, styles.oxygenCard, { borderColor: '#9ca3af' }]}>
-        <Text style={styles.loadingText}>Memuat data sensor...</Text>
+        <View style={styles.loadingState}>
+          <View style={styles.loadingIcon}>
+            <Feather name="activity" size={22} color="#64748b" />
+          </View>
+          <View style={styles.loadingCopy}>
+            <Text style={styles.loadingTitle}>Memuat data sensor</Text>
+            <Text style={styles.loadingText}>Mengambil pembacaan terbaru dari API.</Text>
+          </View>
+        </View>
       </View>
     );
   }
@@ -67,8 +75,8 @@ export const WaterConditionCard: React.FC<WaterConditionCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    borderRadius: 15,
-    padding: 15,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1.5,
     backgroundColor: '#fff',
   },
@@ -76,7 +84,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 2,
     alignSelf: 'flex-start',
@@ -85,7 +93,7 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: '#fff',
     borderColor: '#10b981',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   oxygenHeader: {
     alignItems: 'flex-end',
@@ -127,9 +135,32 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingHorizontal: 5,
   },
+  loadingState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  loadingIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  loadingCopy: {
+    flex: 1,
+  },
+  loadingTitle: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '800',
+  },
   loadingText: {
-    textAlign: 'center',
     color: '#6b7280',
-    padding: 20,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
   },
 });

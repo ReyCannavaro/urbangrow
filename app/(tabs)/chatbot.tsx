@@ -217,7 +217,11 @@ const ChatbotPage: React.FC = () => {
 
                 {messages.length <= 1 && !isLoading ? (
                     <View style={styles.welcomePromptContainer}>
+                        <View style={styles.welcomeIconWrap}>
+                            <Feather name="message-circle" size={34} color="#2563eb" />
+                        </View>
                         <Text style={styles.chatPrompt}>Ada yang bisa saya bantu?</Text>
+                        <Text style={styles.chatPromptSubtitle}>Tanyakan pH, suhu, nutrisi, atau perawatan sistem.</Text>
                     </View>
                 ) : (
                     messages.map(msg => (
@@ -256,7 +260,7 @@ const ChatbotPage: React.FC = () => {
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.textInput}
-                    placeholder={isLoading ? "Menunggu balasan..." : "Tanya FarmBot"}
+                    placeholder={isLoading ? "Menunggu balasan..." : "Tanya AgriBot"}
                     placeholderTextColor="#a3a3a3"
                     value={inputText}
                     onChangeText={setInputText}
@@ -285,28 +289,27 @@ export default ChatbotPage;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f9fafb',
     },
 
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
-        paddingTop: 20,
+        paddingHorizontal: 18,
+        paddingVertical: 18,
         marginTop: 25,
-        marginHorizontal: 15,
-        borderRadius: 20,
-        shadowColor: '#000',
+        marginHorizontal: 16,
+        borderRadius: 18,
+        shadowColor: '#0f172a',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 5,
-        elevation: 5,
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 4,
     },
     headerTitle: {
         fontSize: 20,
-        fontWeight: 'bold',
+        fontWeight: '800',
         color: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
@@ -314,7 +317,7 @@ const styles = StyleSheet.create({
 
     chatScrollArea: {
         flex: 1,
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
     },
     chatContent: {
         flexGrow: 1,
@@ -325,12 +328,29 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        paddingHorizontal: 24,
+    },
+    welcomeIconWrap: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#dbeafe',
+        marginBottom: 14,
     },
     chatPrompt: {
-        fontSize: 24,
-        fontWeight: '600',
-        color: '#4b5563',
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#1f2937',
         textAlign: 'center',
+    },
+    chatPromptSubtitle: {
+        fontSize: 14,
+        lineHeight: 20,
+        color: '#64748b',
+        textAlign: 'center',
+        marginTop: 6,
     },
 
     bubbleContainer: {
@@ -348,10 +368,10 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         maxWidth: '85%',
         borderRadius: 18,
-        shadowColor: '#000',
+        shadowColor: '#0f172a',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
-        shadowRadius: 2,
+        shadowRadius: 4,
         elevation: 1,
     },
     botBubble: {
@@ -409,8 +429,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 10,
         backgroundColor: '#f0f9ff',
-        borderRadius: 18,
-        borderTopLeftRadius: 5,
+        borderRadius: 16,
+        borderTopLeftRadius: 6,
         maxWidth: '70%',
     },
     loadingText: {
@@ -426,12 +446,12 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
     },
     suggestedQuestions: {
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
     },
     questionButton: {
         borderWidth: 1,
         borderColor: '#d1d5db',
-        borderRadius: 25,
+        borderRadius: 999,
         paddingHorizontal: 16,
         paddingVertical: 8,
         marginRight: 8,
@@ -446,7 +466,7 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        paddingHorizontal: 15,
+        paddingHorizontal: 16,
         paddingVertical: 10,
         backgroundColor: '#fff',
         paddingBottom: 15,
@@ -463,7 +483,7 @@ const styles = StyleSheet.create({
         marginRight: 10,
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        marginBottom: 55,
+        marginBottom: 84,
     },
     sendButton: {
         width: 45,
@@ -471,6 +491,6 @@ const styles = StyleSheet.create({
         borderRadius: 22.5,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 55,
+        marginBottom: 84,
     },
 });

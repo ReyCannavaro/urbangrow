@@ -7,29 +7,56 @@ interface StatusButtonProps {
   borderColor: string;
 }
 
-export const StatusButton: React.FC<StatusButtonProps> = ({ label, value, borderColor }) => (
-  <View style={[styles.statusButton, { borderColor }]}>
-    <Text style={[styles.statusButtonLabel, { color: borderColor }]}>{label}</Text>
-    <Text style={styles.statusButtonValue}>{value}</Text>
-  </View>
-);
+export const StatusButton: React.FC<StatusButtonProps> = ({ label, value, borderColor }) => {
+  const isActiveStatus = value === 'ON';
+
+  return (
+    <View style={[styles.statusButton, { borderColor }]}>
+      <View style={styles.statusHeader}>
+        <Text style={[styles.statusButtonLabel, { color: borderColor }]}>{label}</Text>
+        {value === 'ON' || value === 'OFF' ? (
+          <View style={[styles.statusDot, { backgroundColor: isActiveStatus ? '#10b981' : '#94a3b8' }]} />
+        ) : null}
+      </View>
+      <Text style={[styles.statusButtonValue, value === 'ON' && styles.statusButtonValueActive]}>
+        {value}
+      </Text>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   statusButton: {
     width: '48.5%',
-    borderRadius: 15,
-    padding: 20,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1.5,
-    marginBottom: 10,
+    marginBottom: 12,
     backgroundColor: '#fff',
   },
+  statusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   statusButtonLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    marginLeft: 8,
   },
   statusButtonValue: {
     fontSize: 16,
     color: '#6b7280',
-    marginTop: 5,
+    fontWeight: '700',
+    marginTop: 6,
+  },
+  statusButtonValueActive: {
+    color: '#1f2937',
   },
 });

@@ -1,18 +1,20 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
-import { AntDesign, Feather, FontAwesome5 } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 
 const getIcon = (name: string, color: string) => {
+  const iconSize = 24;
+
   switch (name) {
     case 'home':
-      return <Feather name="home" size={30} color={color} />;
+      return <Feather name="home" size={iconSize} color={color} />;
     case 'chatbot':
-      return <FontAwesome5 name="robot" size={30} color={color} />; 
+      return <Feather name="message-circle" size={iconSize} color={color} />;
     case 'control':
-      return <AntDesign name="setting" size={30} color={color} />; 
+      return <Feather name="sliders" size={iconSize} color={color} />;
     case 'notifications':
-      return <Feather name="bell" size={30} color={color} />;
+      return <Feather name="bell" size={iconSize} color={color} />;
     default:
       return null;
   }
@@ -27,16 +29,16 @@ export function AnimatedTabBarIcon({ name, focused }: AnimatedTabBarIconProps) {
   const progress = useSharedValue(0);
 
   const animatedBgStyle = useAnimatedStyle(() => {
-    progress.value = withTiming(focused ? 1 : 0, { duration: 250 });
+      progress.value = withTiming(focused ? 1 : 0, { duration: 250 });
     const backgroundColor = interpolateColor(
       progress.value,
       [0, 1],
-      ['transparent', '#e5e7eb']
+      ['transparent', '#dbeafe']
     );
     return { backgroundColor };
   });
 
-  const activeColor = name === 'chatbot' ? '#6366f1' : '#1f2937';
+  const activeColor = '#2563eb';
   const inactiveColor = '#94a3b8';
 
   return (
@@ -44,9 +46,7 @@ export function AnimatedTabBarIcon({ name, focused }: AnimatedTabBarIconProps) {
       <Animated.View style={[styles.iconWrapper, animatedBgStyle]}>
         {getIcon(
             name,
-            name === 'chatbot'
-              ? (focused ? '#6366f1' : inactiveColor)
-              : (focused ? activeColor : inactiveColor)
+            focused ? activeColor : inactiveColor
         )}
       </Animated.View>
     </View>
@@ -60,9 +60,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapper: {
-    width: 65, 
-    height: 65,
-    borderRadius: 32.5,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },

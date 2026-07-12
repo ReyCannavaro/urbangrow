@@ -23,8 +23,10 @@ export const DataCard: React.FC<DataCardProps> = ({
 }) => (
   <View style={[styles.card, { backgroundColor: bgColor, borderColor }]}>
     <View style={styles.cardHeader}>
-      <Text style={[styles.cardNormalLabel, { borderColor, color: borderColor }]}>Ideal Range</Text>
-      <Feather name={iconName} size={28} color={iconColor} style={styles.cardIcon} />
+      <Text style={[styles.cardNormalLabel, { borderColor, color: borderColor }]}>Zona Aman</Text>
+      <View style={[styles.iconShell, { backgroundColor: '#ffffff99' }]}>
+        <Feather name={iconName} size={22} color={iconColor} />
+      </View>
     </View>
     <Text style={[styles.cardTitle, { color: iconColor }]}>{title}</Text>
     <View style={styles.cardValueContainer}>
@@ -37,8 +39,9 @@ export const DataCard: React.FC<DataCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: '48.5%',
-    borderRadius: 15,
-    padding: 15,
+    minHeight: 138,
+    borderRadius: 16,
+    padding: 14,
     borderWidth: 1.5,
     backgroundColor: '#fff',
   },
@@ -50,21 +53,25 @@ const styles = StyleSheet.create({
   },
   cardNormalLabel: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '800',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 2,
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
-  cardIcon: {
-    alignSelf: 'flex-start',
+  iconShell: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardTitle: {
     fontSize: 14,
     color: '#374151',
-    fontWeight: '500',
+    fontWeight: '700',
   },
   cardValueContainer: {
     flexDirection: 'row',
@@ -73,12 +80,12 @@ const styles = StyleSheet.create({
   },
   cardValue: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#1f2937',
   },
   cardUnit: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '800',
     color: '#1f2937',
     marginLeft: 5,
     marginBottom: 3,
