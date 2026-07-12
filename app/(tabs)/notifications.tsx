@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -12,11 +11,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiGet, apiPost } from '@/constants/api';
+import { AppTheme } from '@/constants/theme';
 
-const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
-const COLOR_DANGER = '#ef4444';
-const COLOR_WARNING = '#facc15';
-const COLOR_INFO = '#3b82f6';
+const COLOR_DANGER = AppTheme.color.danger;
+const COLOR_WARNING = AppTheme.color.warning;
+const COLOR_INFO = AppTheme.color.info;
 
 interface Notification {
     id: number;
@@ -79,7 +78,7 @@ const NotificationCard: React.FC<{ notification: Notification }> = ({ notificati
         <Pressable
             style={({ pressed }) => [
                 styles.notifCard,
-                { backgroundColor: pressed ? '#f3f4f6' : '#fff' },
+                { backgroundColor: pressed ? AppTheme.color.surfaceMuted : AppTheme.color.surface },
             ]}
             onPress={() => Alert.alert(notification.title, notification.message)}
         >
@@ -165,21 +164,25 @@ const NotificationsPage: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
-                <LinearGradient
-                    colors={PRIMARY_GRADIENT}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.header}
-                >
-                    <Text style={styles.headerTitle}>Pusat Notifikasi</Text>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 116 }}>
+                <View style={styles.header}>
+                    <View style={styles.headerTitleRow}>
+                        <View style={styles.headerIcon}>
+                            <Feather name="bell" size={22} color={AppTheme.color.primarySoft} />
+                        </View>
+                        <View style={styles.headerCopy}>
+                            <Text style={styles.headerEyebrow}>System Log</Text>
+                            <Text style={styles.headerTitle}>Pusat Notifikasi</Text>
+                            <Text style={styles.headerSubtitle}>Peringatan dan catatan dari UrbanGrow.</Text>
+                        </View>
+                    </View>
                     <View style={styles.headerActions}>
                         <Pressable
                             onPress={fetchNotifications}
                             style={({ pressed }) => [styles.iconButton, { opacity: pressed ? 0.7 : 1 }]}
                             disabled={isLoading}
                         >
-                            <Feather name="refresh-cw" size={18} color="#fff" />
+                            <Feather name="refresh-cw" size={18} color={AppTheme.color.surfaceStrong} />
                         </Pressable>
                         <Pressable
                             onPress={handleClearAll}
@@ -187,21 +190,21 @@ const NotificationsPage: React.FC = () => {
                             disabled={isClearing}
                         >
                             {isClearing ? (
-                                <ActivityIndicator size="small" color="#fff" />
+                                <ActivityIndicator size="small" color={AppTheme.color.surface} />
                             ) : (
-                                <Feather name="trash-2" size={18} color="#fff" />
+                                <Feather name="trash-2" size={18} color={AppTheme.color.surface} />
                             )}
                             <Text style={styles.clearButtonText}>
                                 {isClearing ? 'Menghapus...' : 'Hapus Semua'}
                             </Text>
                         </Pressable>
                     </View>
-                </LinearGradient>
+                </View>
 
                 <View style={styles.contentArea}>
                     {errorMessage ? (
                         <View style={styles.errorBanner}>
-                            <Feather name="alert-circle" size={16} color="#dc2626" />
+                            <Feather name="alert-circle" size={16} color={AppTheme.color.danger} />
                             <Text style={styles.errorText}>{errorMessage}</Text>
                         </View>
                     ) : null}
@@ -221,7 +224,7 @@ const NotificationsPage: React.FC = () => {
                     ) : Object.keys(groupedNotifications).length === 0 ? (
                         <View style={styles.emptyState}>
                             <View style={styles.emptyIconWrap}>
-                                <Feather name="bell-off" size={34} color="#64748b" />
+                                <Feather name="bell-off" size={34} color={AppTheme.color.textMuted} />
                             </View>
                             <Text style={styles.emptyStateText}>Tidak ada notifikasi saat ini.</Text>
                             <Text style={styles.emptyStateSubtitle}>Status sistem Anda dalam kondisi baik.</Text>
@@ -247,27 +250,60 @@ export default NotificationsPage;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: AppTheme.color.canvas,
     },
     header: {
-        paddingVertical: 18,
-        paddingHorizontal: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
+        padding: 18,
+        justifyContent: 'space-between',
+        alignItems: 'stretch',
         marginTop: 25,
         marginBottom: 14,
         marginHorizontal: 16,
-        borderRadius: 18,
+        borderRadius: AppTheme.radius.panel,
+        backgroundColor: AppTheme.color.surfaceStrong,
+        minHeight: 166,
+    },
+    headerTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    headerIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(223, 242, 233, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(223, 242, 233, 0.18)',
+        marginRight: 12,
+    },
+    headerCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    headerEyebrow: {
+        color: '#9fc8b7',
+        fontSize: 12,
+        fontWeight: '800',
+        marginBottom: 3,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginBottom: 10,
+        fontSize: 25,
+        fontWeight: '900',
+        color: AppTheme.color.surface,
+    },
+    headerSubtitle: {
+        color: '#c7d8d1',
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 4,
+        fontWeight: '600',
     },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginTop: 16,
     },
     iconButton: {
         width: 34,
@@ -275,21 +311,21 @@ const styles = StyleSheet.create({
         borderRadius: 17,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: AppTheme.color.primarySoft,
         marginRight: 8,
     },
     clearButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: AppTheme.color.danger,
         paddingHorizontal: 15,
         paddingVertical: 6,
-        borderRadius: 999,
+        borderRadius: AppTheme.radius.pill,
     },
     clearButtonText: {
-        color: '#fff',
+        color: AppTheme.color.surface,
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '800',
         marginLeft: 8,
     },
     contentArea: {
@@ -299,15 +335,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#fecaca',
-        borderRadius: 14,
-        backgroundColor: '#fef2f2',
+        borderColor: '#f4b7ae',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.dangerSoft,
         paddingHorizontal: 12,
         paddingVertical: 10,
         marginBottom: 10,
     },
     errorText: {
-        color: '#dc2626',
+        color: AppTheme.color.danger,
         fontSize: 13,
         lineHeight: 18,
         marginLeft: 8,
@@ -320,17 +356,17 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        borderRadius: 16,
+        borderRadius: AppTheme.radius.card,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: '#e5e7eb',
-        backgroundColor: '#fff',
+        borderColor: AppTheme.color.line,
+        backgroundColor: AppTheme.color.surface,
     },
     loadingIconBlock: {
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: '#e5e7eb',
+        backgroundColor: AppTheme.color.neutralSoft,
         marginRight: 14,
     },
     loadingCopyBlock: {
@@ -340,22 +376,22 @@ const styles = StyleSheet.create({
         width: '52%',
         height: 12,
         borderRadius: 6,
-        backgroundColor: '#e5e7eb',
+        backgroundColor: AppTheme.color.neutralSoft,
         marginBottom: 9,
     },
     loadingLineBlock: {
         width: '86%',
         height: 10,
         borderRadius: 5,
-        backgroundColor: '#f1f5f9',
+        backgroundColor: AppTheme.color.surfaceMuted,
     },
     dateGroup: {
         marginBottom: 20,
     },
     dateHeader: {
         fontSize: 16,
-        fontWeight: '700',
-        color: '#4b5563',
+        fontWeight: '900',
+        color: AppTheme.color.text,
         marginBottom: 10,
         marginTop: 10,
     },
@@ -363,11 +399,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         padding: 15,
-        borderRadius: 16,
+        borderRadius: AppTheme.radius.card,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: '#e5e7eb',
-        shadowColor: '#0f172a',
+        borderColor: AppTheme.color.line,
+        shadowColor: AppTheme.shadow.color,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 3,
@@ -386,17 +422,19 @@ const styles = StyleSheet.create({
     },
     notifTitle: {
         fontSize: 15,
-        fontWeight: '700',
+        fontWeight: '900',
     },
     notifMessage: {
         fontSize: 14,
-        color: '#6b7280',
+        color: AppTheme.color.textMuted,
         marginTop: 2,
+        lineHeight: 19,
     },
     notifTime: {
         fontSize: 12,
-        color: '#9ca3af',
+        color: AppTheme.color.textSubtle,
         marginTop: 5,
+        fontWeight: '700',
     },
     emptyState: {
         alignItems: 'center',
@@ -405,27 +443,27 @@ const styles = StyleSheet.create({
         paddingHorizontal: 18,
         marginTop: 26,
         borderWidth: 1,
-        borderColor: '#e5e7eb',
-        borderRadius: 18,
-        backgroundColor: '#fff',
+        borderColor: AppTheme.color.line,
+        borderRadius: AppTheme.radius.panel,
+        backgroundColor: AppTheme.color.surface,
     },
     emptyIconWrap: {
         width: 68,
         height: 68,
         borderRadius: 34,
-        backgroundColor: '#f1f5f9',
+        backgroundColor: AppTheme.color.neutralSoft,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 15,
     },
     emptyStateText: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#4b5563',
+        fontWeight: '900',
+        color: AppTheme.color.text,
     },
     emptyStateSubtitle: {
         fontSize: 14,
-        color: '#9ca3af',
+        color: AppTheme.color.textSubtle,
         marginTop: 5,
     },
 });

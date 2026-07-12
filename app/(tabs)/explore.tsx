@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
@@ -23,14 +22,13 @@ import {
     DeviceSyncStatus,
     normalizeActuatorStatus,
 } from '@/constants/api';
+import { AppTheme } from '@/constants/theme';
 
-const PRIMARY_GRADIENT = ['#3b82f6', '#10b981'] as const;
-const COLOR_BLUE = '#3b82f6';
-const COLOR_YELLOW = '#eab308';
-const COLOR_ORANGE = '#f97316';
-const COLOR_SUCCESS = '#10b981';
-const COLOR_MUTED = '#94a3b8';
-const COLOR_DANGER = '#dc2626';
+const COLOR_BLUE = AppTheme.color.info;
+const COLOR_YELLOW = AppTheme.color.warning;
+const COLOR_ORANGE = '#d66a24';
+const COLOR_SUCCESS = AppTheme.color.primary;
+const COLOR_DANGER = AppTheme.color.danger;
 
 interface ControlItem {
     id: 'pompa' | 'lampu';
@@ -68,16 +66,16 @@ interface SensorPreset {
 }
 
 const recommendationData: RecommendationItem[] = [
-    { id: 1, text: 'Kondisi optimal untuk pertumbuhan sayur', icon: 'check-circle', color: '#10b981' },
-    { id: 2, text: 'Pertimbangkan panen kangkung minggu ini', icon: 'alert-triangle', color: '#facc15' },
-    { id: 3, text: 'Berapa pH air dengan kualitas terbaik', icon: 'droplet', color: '#3b82f6' },
+    { id: 1, text: 'Kondisi optimal untuk pertumbuhan sayur', icon: 'check-circle', color: AppTheme.color.primary },
+    { id: 2, text: 'Pertimbangkan panen kangkung minggu ini', icon: 'alert-triangle', color: AppTheme.color.warning },
+    { id: 3, text: 'Berapa pH air dengan kualitas terbaik', icon: 'droplet', color: AppTheme.color.info },
 ];
 
 const sensorPresets: SensorPreset[] = [
-    { id: 'normal', label: 'Normal', temperature: 26.8, ph: 6.8, ldrValue: 460, color: '#10b981' },
-    { id: 'ph-low', label: 'pH Rendah', temperature: 26.4, ph: 5.6, ldrValue: 430, color: '#ef4444' },
-    { id: 'hot', label: 'Suhu Tinggi', temperature: 31.2, ph: 7.1, ldrValue: 410, color: '#f97316' },
-    { id: 'low-light', label: 'Cahaya Rendah', temperature: 25.9, ph: 6.9, ldrValue: 180, color: '#facc15' },
+    { id: 'normal', label: 'Normal', temperature: 26.8, ph: 6.8, ldrValue: 460, color: AppTheme.color.primary },
+    { id: 'ph-low', label: 'pH Rendah', temperature: 26.4, ph: 5.6, ldrValue: 430, color: AppTheme.color.danger },
+    { id: 'hot', label: 'Suhu Tinggi', temperature: 31.2, ph: 7.1, ldrValue: 410, color: '#d66a24' },
+    { id: 'low-light', label: 'Cahaya Rendah', temperature: 25.9, ph: 6.9, ldrValue: 180, color: AppTheme.color.warning },
 ];
 
 const getCommandStatusCopy = (command: ActuatorCommand) => {
@@ -104,7 +102,7 @@ const getCommandStatusColor = (status: ActuatorCommand['status']) => {
         return COLOR_DANGER;
     }
 
-    return '#d97706';
+        return AppTheme.color.warning;
 };
 
 interface MainControlCardProps extends ControlItem {
@@ -115,12 +113,13 @@ interface MainControlCardProps extends ControlItem {
 
 const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, isDisabled, isOn, onToggle, ...item }) => {
     const cardStyle = {
-        backgroundColor: isOn ? color + '20' : '#fefefe', 
-        borderColor: isOn ? color : '#e2e8f0',
+        backgroundColor: isOn ? AppTheme.color.primaryMist : AppTheme.color.surface,
+        borderColor: isOn ? color : AppTheme.color.line,
     };
 
-    const iconColor = isOn ? color : '#64748b';
-    const statusBgColor = isOn ? COLOR_SUCCESS : COLOR_MUTED;
+    const iconColor = isOn ? color : AppTheme.color.textMuted;
+    const statusBgColor = isOn ? AppTheme.color.primarySoft : AppTheme.color.neutralSoft;
+    const statusTextColor = isOn ? AppTheme.color.primaryDark : AppTheme.color.textMuted;
 
     return (
         <Pressable 
@@ -132,16 +131,17 @@ const MainControlCard: React.FC<MainControlCardProps> = ({ title, icon, color, i
             onPress={() => onToggle({ ...item, title, icon, color }, isOn ? 'OFF' : 'ON')}
             disabled={isDisabled}
         >
-            <Feather 
-                name={icon} 
-                size={40} 
-                color={iconColor} 
-                style={styles.controlIcon} 
-            />
+            <View style={[styles.controlIconShell, { backgroundColor: isOn ? `${color}18` : AppTheme.color.neutralSoft }]}>
+                <Feather
+                    name={icon}
+                    size={30}
+                    color={iconColor}
+                />
+            </View>
             <Text style={styles.controlTitleText}>{title}</Text>
             
-            <View style={[styles.controlStatusButton, { backgroundColor: statusBgColor }]}>
-                <Text style={styles.controlStatusText}>
+            <View style={[styles.controlStatusButton, { backgroundColor: statusBgColor, borderColor: isOn ? color : AppTheme.color.lineStrong }]}>
+                <Text style={[styles.controlStatusText, { color: statusTextColor }]}>
                     {isOn ? 'ON' : 'OFF'}
                 </Text>
             </View>
@@ -172,7 +172,8 @@ const ActionPressable: React.FC<ActionCardProps> = ({
         <Pressable
             style={({ pressed }) => [
                 styles.actionCard,
-                { backgroundColor: actionColor, 
+                {
+                  borderColor: `${actionColor}55`,
                   opacity: isDisabled ? 0.58 : pressed ? 0.7 : 1,
                   transform: [{ scale: pressed ? 0.95 : 1 }],
                 }
@@ -180,11 +181,13 @@ const ActionPressable: React.FC<ActionCardProps> = ({
             onPress={onPerformAction}
             disabled={isDisabled}
         >
+            <View style={[styles.actionIconShell, { backgroundColor: `${actionColor}18` }]}>
             {isLoading ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={actionColor} />
             ) : (
-                <Feather name={icon} size={30} color="#fff" />
+                <Feather name={icon} size={24} color={actionColor} />
             )}
+            </View>
             <Text style={styles.actionTitle}>{title}</Text>
             <Text style={styles.actionSubtitle}>{subtitle}</Text>
         </Pressable>
@@ -194,14 +197,14 @@ const ActionPressable: React.FC<ActionCardProps> = ({
 const RecommendationCard: React.FC<{ item: RecommendationItem }> = ({ item }) => {
     return (
         <Pressable 
-            style={({ pressed }) => [styles.recommendationCard, { backgroundColor: pressed ? '#f3f4f6' : '#fff' }]}
+            style={({ pressed }) => [styles.recommendationCard, { backgroundColor: pressed ? AppTheme.color.surfaceMuted : AppTheme.color.surface }]}
             onPress={() => Alert.alert('Rekomendasi', item.text)}
         >
-            <View style={[styles.recommendationIconWrapper, { borderColor: item.color }]}>
+            <View style={[styles.recommendationIconWrapper, { backgroundColor: `${item.color}18`, borderColor: `${item.color}40` }]}>
                 <Feather name={item.icon} size={20} color={item.color} />
             </View>
             <Text style={styles.recommendationText}>{item.text}</Text>
-            <Feather name="chevron-right" size={20} color="#9ca3af" />
+            <Feather name="chevron-right" size={20} color={AppTheme.color.textSubtle} />
         </Pressable>
     );
 };
@@ -389,18 +392,40 @@ const ExplorePage: React.FC = () => {
 
     return (
         <View style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 116 }}>
 
-                <LinearGradient
-                    colors={PRIMARY_GRADIENT}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.header}>
-                    <Text style={styles.headerTitle}>Kontrol Sistem UrbanFarm</Text>
-                </LinearGradient>
+                <View style={styles.header}>
+                    <View style={styles.headerTop}>
+                        <View style={styles.headerIcon}>
+                            <Feather name="sliders" size={22} color={AppTheme.color.primarySoft} />
+                        </View>
+                        <View style={styles.headerCopy}>
+                            <Text style={styles.headerEyebrow}>Control Center</Text>
+                            <Text style={styles.headerTitle}>Kontrol Sistem</Text>
+                            <Text style={styles.headerSubtitle}>Kirim perintah, sync alat, dan input sensor manual.</Text>
+                        </View>
+                    </View>
+                    <View style={styles.headerMetaRow}>
+                        <View style={styles.headerMetaItem}>
+                            <Text style={styles.headerMetaLabel}>Pompa</Text>
+                            <Text style={styles.headerMetaValue}>{actuatorStatus.pumpStatus}</Text>
+                        </View>
+                        <View style={styles.headerMetaItem}>
+                            <Text style={styles.headerMetaLabel}>Lampu</Text>
+                            <Text style={styles.headerMetaValue}>{actuatorStatus.lightStatus}</Text>
+                        </View>
+                        <View style={styles.headerMetaItem}>
+                            <Text style={styles.headerMetaLabel}>Sync</Text>
+                            <Text style={styles.headerMetaValue}>{syncStatus?.status ?? 'cek'}</Text>
+                        </View>
+                    </View>
+                </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Kontrol Perangkat</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Kontrol Perangkat</Text>
+                        <Text style={styles.sectionSubtitle}>Perintah masuk antrean dan menunggu ack ESP.</Text>
+                    </View>
                     {controlError ? <Text style={styles.errorText}>{controlError}</Text> : null}
                     <View style={styles.mainControlsRow}>
                         {controlItems.map(item => (
@@ -415,7 +440,7 @@ const ExplorePage: React.FC = () => {
                     </View>
                     {isActuatorLoading ? (
                         <View style={styles.loadingRow}>
-                            <ActivityIndicator size="small" color="#3b82f6" />
+                            <ActivityIndicator size="small" color={AppTheme.color.primary} />
                             <Text style={styles.loadingText}>Memuat status perangkat...</Text>
                         </View>
                     ) : null}
@@ -450,7 +475,10 @@ const ExplorePage: React.FC = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Input Sensor Manual</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Input Sensor Manual</Text>
+                        <Text style={styles.sectionSubtitle}>Untuk simulasi, kalibrasi, atau pengujian API.</Text>
+                    </View>
                     <View style={styles.manualSensorCard}>
                         <View style={styles.manualInputRow}>
                             <View style={styles.manualInputGroup}>
@@ -461,7 +489,7 @@ const ExplorePage: React.FC = () => {
                                     onChangeText={value => setSensorField('temperature', value)}
                                     keyboardType="decimal-pad"
                                     placeholder="26.8"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor={AppTheme.color.textSubtle}
                                 />
                             </View>
                             <View style={styles.manualInputGroup}>
@@ -472,7 +500,7 @@ const ExplorePage: React.FC = () => {
                                     onChangeText={value => setSensorField('ph', value)}
                                     keyboardType="decimal-pad"
                                     placeholder="6.8"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor={AppTheme.color.textSubtle}
                                 />
                             </View>
                             <View style={styles.manualInputGroup}>
@@ -483,7 +511,7 @@ const ExplorePage: React.FC = () => {
                                     onChangeText={value => setSensorField('ldrValue', value)}
                                     keyboardType="number-pad"
                                     placeholder="460"
-                                    placeholderTextColor="#9ca3af"
+                                    placeholderTextColor={AppTheme.color.textSubtle}
                                 />
                             </View>
                         </View>
@@ -515,9 +543,9 @@ const ExplorePage: React.FC = () => {
                             disabled={isSensorSubmitting}
                         >
                             {isSensorSubmitting ? (
-                                <ActivityIndicator size="small" color="#fff" />
+                                <ActivityIndicator size="small" color={AppTheme.color.surface} />
                             ) : (
-                                <Feather name="upload-cloud" size={20} color="#fff" />
+                                <Feather name="upload-cloud" size={20} color={AppTheme.color.surface} />
                             )}
                             <Text style={styles.submitSensorButtonText}>
                                 {isSensorSubmitting ? 'Mengirim...' : 'Kirim Data Sensor'}
@@ -527,7 +555,10 @@ const ExplorePage: React.FC = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+                        <Text style={styles.sectionSubtitle}>Operasi sekali tekan untuk feeder dan reconnect.</Text>
+                    </View>
                     <View style={styles.actionGrid}>
                         <ActionPressable 
                             title="Beri Pakan" 
@@ -583,13 +614,15 @@ const ExplorePage: React.FC = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Mode Otomatis</Text>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Mode Otomatis</Text>
+                    </View>
                     <Pressable
                         style={({ pressed }) => [
                             styles.feederCard,
                             { 
-                                backgroundColor: isFeederActive ? '#10b98120' : '#fefefe', 
-                                borderColor: isFeederActive ? '#10b981' : '#cbd5e1',
+                                backgroundColor: isFeederActive ? AppTheme.color.primaryMist : AppTheme.color.surface,
+                                borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.line,
                                 opacity: pressed ? 0.95 : 1,
                             }
                         ]}
@@ -599,13 +632,26 @@ const ExplorePage: React.FC = () => {
                         }}
                     >
                         <View style={styles.controlInfo}>
-                            <Feather name="clock" size={24} color={isFeederActive ? '#10b981' : '#6b7280'} />
-                            <Text style={[styles.feederTitle, { color: isFeederActive ? '#10b981' : '#1f2937' }]}>
+                            <Feather name="clock" size={24} color={isFeederActive ? AppTheme.color.primary : AppTheme.color.textMuted} />
+                            <Text style={[styles.feederTitle, { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.text }]}>
                                 Feeder Otomatis
                             </Text>
                         </View>
-                        <View style={[styles.controlStatusButton, { backgroundColor: isFeederActive ? COLOR_SUCCESS : COLOR_MUTED }]}>
-                            <Text style={styles.controlStatusText}>
+                        <View
+                            style={[
+                                styles.controlStatusButton,
+                                {
+                                    backgroundColor: isFeederActive ? AppTheme.color.primarySoft : AppTheme.color.neutralSoft,
+                                    borderColor: isFeederActive ? AppTheme.color.primary : AppTheme.color.lineStrong,
+                                },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.controlStatusText,
+                                    { color: isFeederActive ? AppTheme.color.primaryDark : AppTheme.color.textMuted },
+                                ]}
+                            >
                                 {isFeederActive ? 'ACTIVE' : 'INACTIVE'}
                             </Text>
                         </View>
@@ -614,7 +660,7 @@ const ExplorePage: React.FC = () => {
 
                 <View style={styles.section}>
                     <View style={styles.recommendationHeader}>
-                        <Feather name="trending-up" size={20} color="#10b981" />
+                        <Feather name="trending-up" size={20} color={AppTheme.color.primary} />
                         <Text style={styles.recommendationTitle}>Rekomendasi AI</Text>
                     </View>
                     <View style={styles.recommendationList}>
@@ -634,34 +680,101 @@ export default ExplorePage;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f9fafb',
+        backgroundColor: AppTheme.color.canvas,
     },
 
     header: {
-        paddingVertical: 18,
-        paddingHorizontal: 18,
-        justifyContent: 'center',
-        alignItems: 'center',
+        padding: 18,
+        justifyContent: 'space-between',
+        alignItems: 'stretch',
         marginTop: 25,
         marginBottom: 14,
         marginHorizontal: 16,
-        borderRadius: 18,
+        borderRadius: AppTheme.radius.panel,
+        backgroundColor: AppTheme.color.surfaceStrong,
+        minHeight: 166,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    headerIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(223, 242, 233, 0.12)',
+        borderWidth: 1,
+        borderColor: 'rgba(223, 242, 233, 0.18)',
+        marginRight: 12,
+    },
+    headerCopy: {
+        flex: 1,
+        minWidth: 0,
+    },
+    headerEyebrow: {
+        color: '#9fc8b7',
+        fontSize: 12,
+        fontWeight: '800',
+        marginBottom: 3,
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
+        fontSize: 26,
+        fontWeight: '900',
+        color: AppTheme.color.surface,
+    },
+    headerSubtitle: {
+        color: '#c7d8d1',
+        fontSize: 13,
+        lineHeight: 18,
+        marginTop: 4,
+        fontWeight: '600',
+    },
+    headerMetaRow: {
+        flexDirection: 'row',
+        marginTop: 18,
+    },
+    headerMetaItem: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: 'rgba(223, 242, 233, 0.15)',
+        backgroundColor: 'rgba(223, 242, 233, 0.08)',
+        borderRadius: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        marginRight: 8,
+    },
+    headerMetaLabel: {
+        color: '#91a9a0',
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    headerMetaValue: {
+        color: AppTheme.color.surface,
+        fontSize: 13,
+        fontWeight: '900',
+        marginTop: 2,
     },
 
     section: {
         paddingHorizontal: 16,
         marginTop: 18,
     },
+    sectionHeader: {
+        marginBottom: 12,
+    },
     sectionTitle: {
         fontSize: 18,
+        fontWeight: '900',
+        color: AppTheme.color.text,
+    },
+    sectionSubtitle: {
+        color: AppTheme.color.textSubtle,
+        fontSize: 12,
+        lineHeight: 18,
         fontWeight: '700',
-        color: '#1f2937',
-        marginBottom: 12,
+        marginTop: 3,
     },
 
     mainControlsRow: {
@@ -675,21 +788,21 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: '#fecaca',
-        borderRadius: 12,
-        backgroundColor: '#fef2f2',
+        borderColor: '#f4b7ae',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.dangerSoft,
         paddingHorizontal: 10,
         paddingVertical: 8,
     },
     successText: {
-        color: '#059669',
+        color: AppTheme.color.primaryDark,
         fontSize: 13,
         lineHeight: 18,
         marginBottom: 10,
         borderWidth: 1,
-        borderColor: '#bbf7d0',
-        borderRadius: 12,
-        backgroundColor: '#f0fdf4',
+        borderColor: '#bfe8d6',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.primaryMist,
         paddingHorizontal: 10,
         paddingVertical: 8,
     },
@@ -701,25 +814,25 @@ const styles = StyleSheet.create({
         paddingHorizontal: 5,
     },
     loadingText: {
-        color: '#4b5563',
+        color: AppTheme.color.textMuted,
         fontSize: 13,
-        fontWeight: '500',
+        fontWeight: '700',
         marginLeft: 8,
     },
     commandStatusCard: {
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderRadius: 16,
+        backgroundColor: AppTheme.color.surface,
+        borderWidth: 1,
+        borderRadius: AppTheme.radius.card,
         padding: 12,
-        marginHorizontal: 5,
+        marginHorizontal: 0,
         marginBottom: 12,
     },
     syncStatusCard: {
-        backgroundColor: '#fff',
-        borderWidth: 1.5,
-        borderRadius: 16,
+        backgroundColor: AppTheme.color.surface,
+        borderWidth: 1,
+        borderRadius: AppTheme.radius.card,
         padding: 12,
-        marginHorizontal: 5,
+        marginHorizontal: 0,
         marginTop: 2,
         marginBottom: 8,
     },
@@ -731,21 +844,21 @@ const styles = StyleSheet.create({
     },
     commandStatusBadge: {
         fontSize: 12,
-        fontWeight: '800',
+        fontWeight: '900',
     },
     commandStatusMeta: {
-        color: '#6b7280',
+        color: AppTheme.color.textSubtle,
         fontSize: 12,
-        fontWeight: '600',
+        fontWeight: '800',
     },
     commandStatusText: {
-        color: '#1f2937',
+        color: AppTheme.color.text,
         fontSize: 13,
         lineHeight: 18,
-        fontWeight: '600',
+        fontWeight: '700',
     },
     commandStatusHint: {
-        color: '#6b7280',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
         lineHeight: 16,
         marginTop: 4,
@@ -753,38 +866,49 @@ const styles = StyleSheet.create({
     mainControlCard: {
         flex: 1,
         minHeight: 148,
-        borderRadius: 16,
+        borderRadius: AppTheme.radius.card,
         padding: 14,
         alignItems: 'center',
         justifyContent: 'space-between',
         marginHorizontal: 5,
-        borderWidth: 2,
+        borderWidth: 1,
+        shadowColor: AppTheme.shadow.color,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        elevation: 2,
     },
-    controlIcon: {
-        marginTop: 10,
+    controlIconShell: {
+        width: 54,
+        height: 54,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
     },
     controlTitleText: {
         fontSize: 16,
-        fontWeight: '600',
-        color: '#374151',
+        fontWeight: '800',
+        color: AppTheme.color.text,
+        marginTop: 10,
     },
     controlStatusButton: {
         paddingHorizontal: 15,
-        paddingVertical: 4,
-        borderRadius: 999,
+        paddingVertical: 5,
+        borderRadius: AppTheme.radius.pill,
+        borderWidth: 1,
         marginTop: 8,
     },
     controlStatusText: {
-        color: '#fff',
-        fontWeight: 'bold',
-        fontSize: 14,
+        fontWeight: '900',
+        fontSize: 13,
     },
 
     manualSensorCard: {
-        backgroundColor: '#fff',
+        backgroundColor: AppTheme.color.surface,
         borderWidth: 1,
-        borderColor: '#e5e7eb',
-        borderRadius: 16,
+        borderColor: AppTheme.color.line,
+        borderRadius: AppTheme.radius.panel,
         padding: 14,
     },
     manualInputRow: {
@@ -796,21 +920,21 @@ const styles = StyleSheet.create({
         width: '31.5%',
     },
     manualInputLabel: {
-        color: '#4b5563',
+        color: AppTheme.color.textMuted,
         fontSize: 12,
-        fontWeight: '700',
+        fontWeight: '800',
         marginBottom: 6,
     },
     manualInput: {
         minHeight: 44,
         borderWidth: 1,
-        borderColor: '#d1d5db',
-        borderRadius: 12,
+        borderColor: AppTheme.color.lineStrong,
+        borderRadius: AppTheme.radius.input,
         paddingHorizontal: 10,
-        backgroundColor: '#f9fafb',
-        color: '#1f2937',
+        backgroundColor: AppTheme.color.surfaceMuted,
+        color: AppTheme.color.text,
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '800',
     },
     presetGrid: {
         flexDirection: 'row',
@@ -820,12 +944,12 @@ const styles = StyleSheet.create({
     },
     presetButton: {
         width: '48.5%',
-        borderWidth: 1.5,
-        borderRadius: 12,
+        borderWidth: 1,
+        borderRadius: AppTheme.radius.input,
         paddingVertical: 9,
         paddingHorizontal: 10,
         marginBottom: 8,
-        backgroundColor: '#fff',
+        backgroundColor: AppTheme.color.surface,
         alignItems: 'center',
     },
     presetButtonText: {
@@ -834,14 +958,14 @@ const styles = StyleSheet.create({
     },
     submitSensorButton: {
         minHeight: 46,
-        borderRadius: 14,
-        backgroundColor: '#3b82f6',
+        borderRadius: AppTheme.radius.input,
+        backgroundColor: AppTheme.color.primary,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
     },
     submitSensorButtonText: {
-        color: '#fff',
+        color: AppTheme.color.surface,
         fontSize: 15,
         fontWeight: '700',
         marginLeft: 8,
@@ -854,35 +978,41 @@ const styles = StyleSheet.create({
     },
     actionCard: {
         flex: 1,
-        alignItems: 'center',
-        paddingVertical: 20,
+        alignItems: 'flex-start',
+        padding: 14,
         marginHorizontal: 5,
+        borderRadius: AppTheme.radius.card,
+        borderWidth: 1,
+        backgroundColor: AppTheme.color.surface,
+        minHeight: 130,
+    },
+    actionIconShell: {
+        width: 42,
+        height: 42,
         borderRadius: 16,
-        shadowColor: '#0f172a',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 2,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
     actionTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginTop: 8,
+        fontWeight: '900',
+        color: AppTheme.color.text,
     },
     actionSubtitle: {
         fontSize: 12,
-        color: '#fff',
-        opacity: 0.8,
+        color: AppTheme.color.textMuted,
+        fontWeight: '700',
+        marginTop: 3,
     },
 
     feederCard: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 20,
-        borderRadius: 16,
-        borderWidth: 2,
+        padding: 16,
+        borderRadius: AppTheme.radius.panel,
+        borderWidth: 1,
     },
     controlInfo: {
         flexDirection: 'row',
@@ -890,7 +1020,7 @@ const styles = StyleSheet.create({
     },
     feederTitle: {
         fontSize: 16,
-        fontWeight: '700',
+        fontWeight: '900',
         marginLeft: 15,
     },
     
@@ -901,16 +1031,16 @@ const styles = StyleSheet.create({
     },
     recommendationTitle: {
         fontSize: 18,
-        fontWeight: '700',
-        color: '#1f2937',
+        fontWeight: '900',
+        color: AppTheme.color.text,
         marginLeft: 8,
     },
     recommendationList: {
-        backgroundColor: '#fff',
-        borderRadius: 16,
+        backgroundColor: AppTheme.color.surface,
+        borderRadius: AppTheme.radius.panel,
         paddingVertical: 5,
         borderWidth: 1,
-        borderColor: '#f3f4f6',
+        borderColor: AppTheme.color.line,
     },
     recommendationCard: {
         flexDirection: 'row',
@@ -919,21 +1049,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         marginHorizontal: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: AppTheme.color.line,
     },
     recommendationIconWrapper: {
         width: 35,
         height: 35,
         justifyContent: 'center',
         alignItems: 'center',
-        borderRadius: 8,
-        borderWidth: 2,
+        borderRadius: 14,
+        borderWidth: 1,
     },
     recommendationText: {
         flex: 1,
         fontSize: 15,
-        color: '#374151',
-        fontWeight: '500',
+        color: AppTheme.color.text,
+        fontWeight: '700',
         marginLeft: 15,
     },
 });

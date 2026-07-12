@@ -2,6 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, interpolateColor } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
+import { AppTheme } from '@/constants/theme';
 
 const getIcon = (name: string, color: string) => {
   const iconSize = 24;
@@ -33,13 +34,13 @@ export function AnimatedTabBarIcon({ name, focused }: AnimatedTabBarIconProps) {
     const backgroundColor = interpolateColor(
       progress.value,
       [0, 1],
-      ['transparent', '#dbeafe']
+      ['transparent', AppTheme.color.primarySoft]
     );
     return { backgroundColor };
   });
 
-  const activeColor = '#2563eb';
-  const inactiveColor = '#94a3b8';
+  const activeColor = AppTheme.color.primaryDark;
+  const inactiveColor = AppTheme.color.textSubtle;
 
   return (
     <View style={styles.container}>

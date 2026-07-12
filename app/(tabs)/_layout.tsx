@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ApiStatusBanner } from '@/components/system/ApiStatusBanner';
+import { AppTheme } from '@/constants/theme';
 import { StaticTabBarIcon } from '../../components/StaticTabBarIcon';
 
 export default function TabLayout() {
@@ -11,7 +12,11 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarShowLabel: false,
+          tabBarShowLabel: true,
+          tabBarActiveTintColor: AppTheme.color.primarySoft,
+          tabBarInactiveTintColor: '#9fb1a8',
+          tabBarLabelStyle: styles.tabBarLabel,
+          tabBarItemStyle: styles.tabBarItem,
           tabBarStyle: styles.tabBar,
         }}>
         <Tabs.Screen
@@ -58,26 +63,33 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: AppTheme.color.canvas,
   },
   tabBar: {
-    height: 72,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eef2f7',
+    height: 76,
+    backgroundColor: AppTheme.color.surfaceStrong,
+    borderTopWidth: 0,
     position: 'absolute',
     bottom: 12,
     left: 16,
     right: 16,
-    borderRadius: 28,
+    borderRadius: AppTheme.radius.panel,
     overflow: 'hidden',
-    shadowColor: '#0f172a',
+    shadowColor: AppTheme.shadow.color,
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.18,
     shadowRadius: 20,
     elevation: 12,
     paddingHorizontal: 8,
-    paddingTop: 8,
+    paddingTop: 7,
     paddingBottom: 8,
+  },
+  tabBarItem: {
+    borderRadius: 18,
+  },
+  tabBarLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 0,
   },
 });

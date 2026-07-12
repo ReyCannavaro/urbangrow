@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
+import { AppTheme } from '@/constants/theme';
 
 interface GradientIconProps {
   name: 'home' | 'robot' | 'hexagon' | 'bell' ;
@@ -9,7 +9,7 @@ interface GradientIconProps {
   label: string;
 }
 
-const getIconComponent = (name: GradientIconProps['name'], color: string, focused: boolean) => {
+const getIconComponent = (name: GradientIconProps['name'], color: string) => {
   if (name === 'robot') {
     return <FontAwesome5 name="robot" size={24} color={color} />;
   } else if (name === 'hexagon') {
@@ -23,24 +23,15 @@ const getIconComponent = (name: GradientIconProps['name'], color: string, focuse
 };
 
 export default function GradientIcon({ name, focused, label }: GradientIconProps) {
-  const useGradient = focused && (name === 'robot' || name === 'hexagon');
+  const iconColor = focused ? AppTheme.color.primaryDark : AppTheme.color.textSubtle;
 
   return (
     <View style={styles.container}>
-      {useGradient ? (
-        <LinearGradient
-          colors={['#3780F2', '#2AA1AA', '#1CC162']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientMask}
-        >
-          {getIconComponent(name, 'white', focused)}
-        </LinearGradient>
-      ) : (
-        getIconComponent(name, focused ? '#3780F2' : '#a3a3a3', focused)
-      )}
+      <View style={[styles.iconShell, focused && styles.iconShellActive]}>
+        {getIconComponent(name, iconColor)}
+      </View>
       
-      <Text style={[styles.label, { color: focused ? '#3780F2' : '#a3a3a3' }]}>{label}</Text>
+      <Text style={[styles.label, { color: focused ? AppTheme.color.primaryDark : AppTheme.color.textSubtle }]}>{label}</Text>
     </View>
   );
 }
@@ -56,11 +47,14 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
-  gradientMask: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  iconShell: {
+    width: 34,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  iconShellActive: {
+    backgroundColor: AppTheme.color.primarySoft,
   },
 });

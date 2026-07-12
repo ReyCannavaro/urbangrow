@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { AppTheme } from '@/constants/theme';
 
 const getIcon = (name: string, color: string) => {
   const iconSize = 24;
@@ -25,8 +26,8 @@ interface StaticTabBarIconProps {
 }
 
 export function StaticTabBarIcon({ name, focused }: StaticTabBarIconProps) {
-  const activeColor = '#2563eb';
-  const inactiveColor = '#94a3b8';
+  const activeColor = AppTheme.color.surfaceStrong;
+  const inactiveColor = '#9fb1a8';
 
   const iconWrapperStyle = focused ? styles.iconWrapperActive : styles.iconWrapperInactive;
 
@@ -49,14 +50,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconWrapperBase: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 38,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconWrapperActive: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: AppTheme.color.primarySoft,
   },
   iconWrapperInactive: {
     backgroundColor: 'transparent',

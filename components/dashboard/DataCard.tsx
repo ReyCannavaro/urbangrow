@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { AppTheme } from '@/constants/theme';
 
 interface DataCardProps {
   title: string;
@@ -21,14 +22,17 @@ export const DataCard: React.FC<DataCardProps> = ({
   iconColor,
   borderColor,
 }) => (
-  <View style={[styles.card, { backgroundColor: bgColor, borderColor }]}>
+  <View style={styles.card}>
+    <View style={[styles.accentRail, { backgroundColor: borderColor }]} />
     <View style={styles.cardHeader}>
-      <Text style={[styles.cardNormalLabel, { borderColor, color: borderColor }]}>Zona Aman</Text>
-      <View style={[styles.iconShell, { backgroundColor: '#ffffff99' }]}>
+      <View>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardNormalLabel}>Pembacaan langsung</Text>
+      </View>
+      <View style={[styles.iconShell, { backgroundColor: bgColor, borderColor: `${borderColor}33` }]}>
         <Feather name={iconName} size={22} color={iconColor} />
       </View>
     </View>
-    <Text style={[styles.cardTitle, { color: iconColor }]}>{title}</Text>
     <View style={styles.cardValueContainer}>
       <Text style={styles.cardValue}>{value}</Text>
       <Text style={styles.cardUnit}>{unit}</Text>
@@ -39,27 +43,37 @@ export const DataCard: React.FC<DataCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     width: '48.5%',
-    minHeight: 138,
-    borderRadius: 16,
+    minHeight: 146,
+    borderRadius: AppTheme.radius.card,
     padding: 14,
-    borderWidth: 1.5,
-    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: AppTheme.color.line,
+    backgroundColor: AppTheme.color.surface,
+    overflow: 'hidden',
+    shadowColor: AppTheme.shadow.color,
+    shadowOffset: AppTheme.shadow.offset,
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  accentRail: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   cardNormalLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 11,
+    fontWeight: '700',
+    color: AppTheme.color.textSubtle,
+    marginTop: 3,
   },
   iconShell: {
     width: 36,
@@ -67,26 +81,28 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   cardTitle: {
     fontSize: 14,
-    color: '#374151',
-    fontWeight: '700',
+    color: AppTheme.color.text,
+    fontWeight: '800',
   },
   cardValueContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    marginTop: 5,
+    marginTop: 'auto',
   },
   cardValue: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1f2937',
+    fontSize: 34,
+    fontWeight: '900',
+    color: AppTheme.color.text,
+    letterSpacing: 0,
   },
   cardUnit: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#1f2937',
+    color: AppTheme.color.textMuted,
     marginLeft: 5,
     marginBottom: 3,
   },
