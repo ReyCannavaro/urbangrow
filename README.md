@@ -1,50 +1,213 @@
-# Welcome to your Expo app 👋
+# UrbanGrow App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+UrbanGrow adalah aplikasi monitoring dan kontrol urban farming/aquaponik berbasis Expo React Native. Aplikasi ini menampilkan data sensor air, status aktuator, riwayat sensor, notifikasi kondisi sistem, kontrol perangkat, input sensor manual untuk testing, dan chatbot AgriBot.
 
-## Get started
+## Fitur Utama
 
-1. Install dependencies
+- Dashboard suhu air, pH, LDR, status air, dan aktuator.
+- Riwayat sensor dengan mini chart suhu dan pH.
+- Kontrol pompa air dan lampu grow melalui API.
+- Input sensor manual untuk testing tanpa alat IoT.
+- Notifikasi real dari kondisi sensor dan aktuator.
+- AgriBot untuk pertanyaan seputar aquaponik, hidroponik, dan urban farming.
+- Backend Python standard library dengan SQLite, tanpa dependency tambahan.
 
-   ```bash
-   npm install
-   ```
+## Struktur Project
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+app/(tabs)/
+  index.tsx          Dashboard monitoring
+  explore.tsx        Kontrol perangkat dan input sensor manual
+  notifications.tsx  Notifikasi sistem
+  chatbot.tsx        AgriBot
+API/
+  app.py             Backend API Python + SQLite
+constants/
+  api.ts             Konfigurasi API frontend
+docs/
+  API_CONFIGURATION.md
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Prasyarat
 
-## Learn more
+- Node.js dan npm.
+- Python 3.10+.
+- Expo Go atau emulator Android/iOS.
 
-To learn more about developing your project with Expo, look at the following resources:
+Backend tidak membutuhkan `pip install` karena menggunakan standard library Python.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Setup Frontend
 
-## Join the community
+Install dependency:
 
-Join our community of developers creating universal apps.
+```bash
+npm install
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Salin konfigurasi env:
+
+```bash
+copy .env.example .env
+```
+
+Pilih profile API di `.env`:
+
+```bash
+EXPO_PUBLIC_API_PROFILE=deviceLan
+```
+
+Untuk override IP backend langsung:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=http://192.168.1.10:5000
+```
+
+Profile yang tersedia:
+
+| Profile | URL | Kegunaan |
+| --- | --- | --- |
+| `deviceLan` | `http://10.249.160.45:5000` | HP fisik satu Wi-Fi dengan backend |
+| `androidEmulator` | `http://10.0.2.2:5000` | Android emulator |
+| `iosSimulator` | `http://localhost:5000` | iOS simulator |
+| `web` | `http://localhost:5000` | Expo web |
+
+Detail tambahan ada di [docs/API_CONFIGURATION.md](docs/API_CONFIGURATION.md).
+
+## Run Backend
+
+Jalankan API:
+
+```bash
+python API\app.py
+```
+
+Default backend:
+
+```text
+Host: 0.0.0.0
+Port: 5000
+Database: API/urban_grow.db
+```
+
+Opsional:
+
+```bash
+set URBANGROW_API_HOST=0.0.0.0
+set URBANGROW_API_PORT=5000
+set URBANGROW_DATABASE_PATH=API\urban_grow.db
+```
+
+## Setup Gemini Untuk AgriBot
+
+API key Gemini tidak disimpan di frontend. Set key di backend:
+
+```bash
+set GEMINI_API_KEY=your_gemini_api_key_here
+python API\app.py
+```
+
+Alternatif:
+
+```bash
+set GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key_here
+```
+
+Opsional ganti model:
+
+```bash
+set GEMINI_MODEL=gemini-2.5-flash
+```
+
+Jangan memakai prefix `EXPO_PUBLIC_` untuk secret backend.
+
+## Run App
+
+Start Expo:
+
+```bash
+npm run start
+```
+
+Target lain:
+
+```bash
+npm run android
+npm run ios
+npm run web
+```
+
+## Endpoint API
+
+| Method | Endpoint | Fungsi |
+| --- | --- | --- |
+| `GET` | `/api/health` | Cek status API |
+| `POST` | `/api/sensor-readings` | Simpan data sensor |
+| `POST` | `/api/update-sensor` | Alias input sensor |
+| `POST` | `/receive_data` | Kompatibilitas endpoint IoT lama |
+| `GET` | `/api/latest-reading` | Ambil data sensor terbaru |
+| `GET` | `/api/sensor-history?limit=12` | Ambil riwayat sensor |
+| `GET` | `/api/sensor-log` | Alias riwayat sensor |
+| `GET` | `/api/actuator-status` | Ambil status pompa/lampu |
+| `POST` | `/api/actuator-control` | Ubah status aktuator |
+| `GET` | `/api/notifications` | Ambil notifikasi real |
+| `POST` | `/api/chat` | Kirim pesan ke AgriBot |
+
+## Contoh Request Sensor
+
+PowerShell:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/sensor-readings `
+  -H "Content-Type: application/json" `
+  -d "{\"temperature\":27.4,\"ph\":6.7,\"ldr_value\":420}"
+```
+
+Contoh kondisi pH rendah:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/sensor-readings `
+  -H "Content-Type: application/json" `
+  -d "{\"temperature\":26.4,\"ph\":5.6,\"ldr_value\":430}"
+```
+
+Contoh kontrol aktuator:
+
+```powershell
+curl.exe -X POST http://localhost:5000/api/actuator-control `
+  -H "Content-Type: application/json" `
+  -d "{\"key\":\"pumpStatus\",\"value\":\"ON\"}"
+```
+
+## Validasi
+
+Frontend lint:
+
+```bash
+npm run lint
+```
+
+Backend syntax check:
+
+```bash
+python -m py_compile API\app.py
+```
+
+## Troubleshooting
+
+Jika Expo Go di HP tidak bisa konek ke API:
+
+- Pastikan HP dan laptop satu Wi-Fi.
+- Jalankan backend dengan `URBANGROW_API_HOST=0.0.0.0`.
+- Gunakan IP LAN laptop di `EXPO_PUBLIC_API_BASE_URL`.
+- Pastikan firewall mengizinkan port `5000`.
+- Restart Expo setelah mengubah `.env`.
+
+Jika Android emulator tidak bisa konek:
+
+- Gunakan `EXPO_PUBLIC_API_PROFILE=androidEmulator`.
+- Pastikan backend berjalan di laptop.
+
+Jika AgriBot membalas key belum dikonfigurasi:
+
+- Set `GEMINI_API_KEY` sebelum menjalankan `python API\app.py`.
+- Jalankan ulang backend setelah mengubah env.
